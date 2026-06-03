@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@9.15.4",
   "scripts": {
-    "start": "tsx --env-file=.env.local index.ts",
+    "start": "PIE_TOKEN=${PIE_TOKEN} PIE_BASE_URL=${PIE_BASE_URL} tsx index.ts",
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit"
   },
