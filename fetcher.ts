@@ -26,7 +26,7 @@ function getBinaryPath(): string {
 
   // 在 PieBox skills 目录下查找
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
-  const skillsDir = path.resolve(__dirname, "../../../.config/piebox/skills/sensortower-cli");
+  const skillsDir = path.resolve(__dirname, "../../.config/piebox/skills/sensortower-cli");
 
   if (fs.existsSync(path.join(skillsDir, "sensortower"))) {
     return path.join(skillsDir, "sensortower");
