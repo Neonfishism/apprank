@@ -1,0 +1,17 @@
+{
+  "name": "app-ranking-monitor",
+  "version": "1.0.0",
+  "description": "iOS App Store 下载榜异动监控工具 — 每日拉取核心市场 Top 200，对比多时间窗口，飞书推送异动",
+  "type": "module",
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
