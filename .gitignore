@@ -1,6 +1,5 @@
 node_modules/
 dist/
 snapshots/
-.env.local
 *.log
 .pieconfig/
