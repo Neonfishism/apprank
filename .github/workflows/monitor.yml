@@ -2,9 +2,12 @@ name: App排名异动监控
 
 on:
   schedule:
-    # 每天 UTC 2:00（北京时间 10:00）
     - cron: '0 2 * * *'
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
+
+# 允许写入仓库（提交快照）
+permissions:
+  contents: write
 
 jobs:
   monitor:
@@ -25,3 +28,11 @@ jobs:
 
       - name: Run monitor
         run: pnpm start
+
+      - name: Commit snapshot
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add snapshots/
+          git diff --cached --quiet || git commit -m "snapshot $(date +%Y-%m-%d)"
+          git push
