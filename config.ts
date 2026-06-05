@@ -25,6 +25,7 @@ export const COMPARISON_WINDOWS: { days: number; label: string }[] = [
 ];
 
 export const TOP_N = 100;
+export const SNAPSHOT_RETENTION_DAYS = 100;
 export const MAX_RETRIES = 3;
 export const SNAPSHOT_DIR = "snapshots";
 

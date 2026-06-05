@@ -7,7 +7,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { DailySnapshot, MarketSnapshot, SnapshotAppEntry } from "./types.js";
-import { SNAPSHOT_DIR } from "./config.js";
+import { SNAPSHOT_DIR, SNAPSHOT_RETENTION_DAYS } from "./config.js";
 
 /** 确保快照目录存在 */
 function ensureDir(): string {
@@ -95,5 +95,5 @@ export function cleanOldSnapshots(beforeDate: string): number {
  * 计算需要清理的截止日期
  */
 export function getCleanupCutoff(): string {
-  return getDateBefore(35); // SNAPSHOT_RETENTION_DAYS
+  return getDateBefore(SNAPSHOT_RETENTION_DAYS);
 }
