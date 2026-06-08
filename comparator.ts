@@ -5,7 +5,6 @@
 import type { DailySnapshot, AppMeta, RankChange, Anomaly } from "./types.js";
 import { getThreshold, COMPARISON_WINDOWS, MARKETS } from "./config.js";
 
-/** 原始异动（元数据待填充） */
 export interface RawAnomaly {
   country: string;
   appId: number;
@@ -51,7 +50,6 @@ export function detectAnomalies(
   return anomalies;
 }
 
-/** 用元数据填充异动对象 */
 export function resolveAnomalies(rawAnomalies: RawAnomaly[], metaMap: Map<number, AppMeta>): Anomaly[] {
   return rawAnomalies.map((raw) => {
     const meta = metaMap.get(raw.appId);
@@ -61,22 +59,11 @@ export function resolveAnomalies(rawAnomalies: RawAnomaly[], metaMap: Map<number
       appId: raw.appId,
       appName: meta?.name || `App ${raw.appId}`,
       publisherName: meta?.publisher || "未知",
-      category: meta?.category || "全部",
+      category: "游戏",
       currentRank: raw.currentRank,
       appStoreUrl: meta?.url || "",
       changes: raw.changes,
       emoji: raw.currentRank <= 10 ? "🚀" : "⬆️",
     };
   });
-}
-
-export function groupAndSort(anomalies: Anomaly[]): Map<string, Anomaly[]> {
-  const groups = new Map<string, Anomaly[]>();
-  for (const a of anomalies) {
-    const key = `${a.country}::${a.category}`;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(a);
-  }
-  for (const apps of groups.values()) apps.sort((a, b) => a.currentRank - b.currentRank);
-  return groups;
 }
