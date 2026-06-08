@@ -30,7 +30,7 @@ export function buildFeishuMessage(anomalies: Anomaly[], date: string): string {
   const lines: string[] = [`📊 **游戏下载榜异动警报** | ${date}\n`];
 
   for (const [country, apps] of byCountry) {
-    lines.push(`${FLAGS[country] || "🏳️"} **${country}**`);
+    lines.push(`${FLAGS[country] || "🏳️"} **${apps[0].countryName}**`);
 
     for (const app of apps) {
       const maxChange = Math.max(...app.changes.map((c) => c.change ?? 0));

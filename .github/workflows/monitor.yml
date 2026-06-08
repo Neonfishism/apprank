@@ -2,7 +2,7 @@ name: App排名异动监控
 
 on:
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '0 3 * * *'
   workflow_dispatch:
 
 # 允许写入仓库（提交快照）
