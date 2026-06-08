@@ -13,14 +13,13 @@ const FLAGS: Record<string, string> = {
 
 function formatChange(c: RankChange): string {
   if (c.oldRank === null || c.change === null) return `${c.windowLabel}  ——`;
-  const arrow = c.change > 0 ? "↑" : c.change < 0 ? "↓" : "→";
-  return `${c.windowLabel}  ${c.oldRank}→${c.oldRank - (c.change ?? 0)} ${arrow}${Math.abs(c.change)}${c.triggered ? " 🔥" : ""}`;
+  const arrow = c.change > 0 ? "⬆" : c.change < 0 ? "⬇" : "→";
+  return `${c.windowLabel}  ${c.oldRank}→${c.oldRank - (c.change ?? 0)}  ${arrow}${Math.abs(c.change)}${c.triggered ? "🔥" : ""}`;
 }
 
 export function buildFeishuMessage(anomalies: Anomaly[], date: string): string {
   if (anomalies.length === 0) return "";
 
-  // 按国家分组
   const byCountry = new Map<string, Anomaly[]>();
   for (const a of anomalies) {
     if (!byCountry.has(a.country)) byCountry.set(a.country, []);
@@ -35,9 +34,9 @@ export function buildFeishuMessage(anomalies: Anomaly[], date: string): string {
 
     for (const app of apps) {
       const maxChange = Math.max(...app.changes.map((c) => c.change ?? 0));
-      lines.push(`  ${app.emoji} **${app.appName}**  [🔗](${app.appStoreUrl})`);
-      lines.push(`     **${app.currentRank}名**  (↑${maxChange})`);
-      lines.push(`     ${app.changes.map(formatChange).join("  |  ")}`);
+      lines.push(`  ${app.emoji} **${app.appName}**  app链接：[🔗](${app.appStoreUrl})`);
+      lines.push(`        当前排名：**${app.currentRank}名**  (⬆${maxChange})`);
+      lines.push(`        ${app.changes.map(formatChange).join("  |  ")}`);
       lines.push("");
     }
   }
