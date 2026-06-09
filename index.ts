@@ -77,4 +77,10 @@ async function main(): Promise<void> {
   console.log(`\n======== 完成 ========\n`);
 }
 
-main().catch((err) => { console.error("\n❌ 执行失败:", err); process.exit(1); });
+main().catch((err) => { console.error("\n❌ 执行失败:", err); }).finally(() => {
+  // GitHub Actions 中正常退出；PieBox Preview 中保持进程不退出，防止反复重启
+  if (!process.env.CI) {
+    console.log("[预览模式] 保持进程运行，防止重复执行...");
+    setInterval(() => {}, 3600_000);
+  }
+});
