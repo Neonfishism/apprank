@@ -42,11 +42,13 @@ async function fetchWithRetry(url: string, retries = MAX_RETRIES): Promise<strin
   throw new Error("unreachable");
 }
 
-/** 从 entry 中提取 App Store 链接 */
+/** 从 entry 中提取 App Store 链接（去除追踪参数） */
 function extractUrl(entry: ITunesEntry): string {
   const links = Array.isArray(entry.link) ? entry.link : entry.link ? [entry.link] : [];
   for (const l of links) {
-    if (l?.attributes?.href) return l.attributes.href;
+    if (l?.attributes?.href) {
+      return l.attributes.href.replace(/\?.*$/, "");
+    }
   }
   return entry.id?.label || "";
 }
