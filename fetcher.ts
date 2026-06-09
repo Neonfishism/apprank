@@ -13,6 +13,7 @@ const COUNTRY_MAP: Record<string, string> = {
   CN: "cn", TW: "tw", JP: "jp", KR: "kr",
   SA: "sa", TR: "tr", RU: "ru", DE: "de",
   FR: "fr", IT: "it", US: "us",
+  BR: "br", HK: "hk", ID: "id", TH: "th", PH: "ph",
 };
 
 /** iTunes RSS 返回的条目 */

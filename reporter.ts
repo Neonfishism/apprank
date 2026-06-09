@@ -9,6 +9,7 @@ import { MAX_RETRIES } from "./config.js";
 const FLAGS: Record<string, string> = {
   CN: "🇨🇳", TW: "🇹🇼", JP: "🇯🇵", KR: "🇰🇷", SA: "🇸🇦",
   TR: "🇹🇷", RU: "🇷🇺", DE: "🇩🇪", FR: "🇫🇷", IT: "🇮🇹", US: "🇺🇸",
+  BR: "🇧🇷", HK: "🇭🇰", ID: "🇮🇩", TH: "🇹🇭", PH: "🇵🇭",
 };
 
 function formatChange(c: RankChange): string {

@@ -6,6 +6,7 @@ export const MARKETS: Record<string, string> = {
   CN: "中国大陆", TW: "台湾", JP: "日本", KR: "韩国",
   SA: "沙特阿拉伯", TR: "土耳其", RU: "俄罗斯", DE: "德国",
   FR: "法国", IT: "意大利", US: "美国",
+  BR: "巴西", HK: "香港", ID: "印尼", TH: "泰国", PH: "菲律宾",
 };
 
 export const MARKET_CODES = Object.keys(MARKETS);
