@@ -3,13 +3,13 @@
  */
 
 import type { Anomaly, RankChange } from "./types.js";
-import { MAX_RETRIES } from "./config.js";
+import { MAX_RETRIES, ROBLOX_MARKET } from "./config.js";
 
-/** 国家 → 国旗 */
 const FLAGS: Record<string, string> = {
   CN: "🇨🇳", TW: "🇹🇼", JP: "🇯🇵", KR: "🇰🇷", SA: "🇸🇦",
   TR: "🇹🇷", RU: "🇷🇺", DE: "🇩🇪", FR: "🇫🇷", IT: "🇮🇹", US: "🇺🇸",
   BR: "🇧🇷", HK: "🇭🇰", ID: "🇮🇩", TH: "🇹🇭", PH: "🇵🇭",
+  RB: "🎮",
 };
 
 function formatChange(c: RankChange): string {
@@ -18,32 +18,52 @@ function formatChange(c: RankChange): string {
   return `${c.windowLabel}  ${c.oldRank}→${c.oldRank - (c.change ?? 0)}  ${arrow}${Math.abs(c.change)}${c.triggered ? "🔥" : ""}`;
 }
 
+const PLATFORM_LABELS: Record<string, string> = {
+  ios: "📱 iOS 游戏榜",
+  roblox: "🎮 Roblox 在线榜",
+};
+
 export function buildFeishuMessage(anomalies: Anomaly[], date: string): string {
   if (anomalies.length === 0) return "";
 
-  const byCountry = new Map<string, Anomaly[]>();
-  for (const a of anomalies) {
-    if (!byCountry.has(a.country)) byCountry.set(a.country, []);
-    byCountry.get(a.country)!.push(a);
-  }
-  for (const apps of byCountry.values()) apps.sort((a, b) => a.currentRank - b.currentRank);
+  const lines: string[] = [`📊 **游戏异动警报** | ${date}\n`];
 
-  const lines: string[] = [`📊 **游戏下载榜异动警报** | ${date}\n`];
+  // 按平台分组
+  const iosAnomalies = anomalies.filter((a) => a.country !== ROBLOX_MARKET);
+  const rbAnomalies = anomalies.filter((a) => a.country === ROBLOX_MARKET);
 
-  for (const [country, apps] of byCountry) {
-    lines.push(`${FLAGS[country] || "🏳️"} **${apps[0].countryName}**`);
-
-    for (const app of apps) {
-      const maxChange = Math.max(...app.changes.map((c) => c.change ?? 0));
-      lines.push(`  ${app.emoji} **${app.appName}**  app链接：[🔗](${app.appStoreUrl})`);
-      lines.push(`        当前排名：**${app.currentRank}名**  (⬆${maxChange})`);
-      lines.push(`        ${app.changes.map(formatChange).join("  |  ")}`);
-      lines.push("");
+  // iOS：按国家
+  if (iosAnomalies.length > 0) {
+    lines.push(PLATFORM_LABELS.ios);
+    const byCountry = new Map<string, Anomaly[]>();
+    for (const a of iosAnomalies) {
+      if (!byCountry.has(a.country)) byCountry.set(a.country, []);
+      byCountry.get(a.country)!.push(a);
     }
+    for (const [country, apps] of byCountry) {
+      apps.sort((a, b) => a.currentRank - b.currentRank);
+      lines.push(`  ${FLAGS[country] || "🏳️"} **${apps[0].countryName}**`);
+      for (const app of apps) appendApp(lines, app);
+    }
+  }
+
+  // Roblox：单列表
+  if (rbAnomalies.length > 0) {
+    lines.push(PLATFORM_LABELS.roblox);
+    rbAnomalies.sort((a, b) => a.currentRank - b.currentRank);
+    for (const app of rbAnomalies) appendApp(lines, app);
   }
 
   lines.push(`---\n共 ${anomalies.length} 款游戏触发异动`);
   return lines.join("\n");
+}
+
+function appendApp(lines: string[], app: Anomaly) {
+  const maxChange = Math.max(...app.changes.map((c) => c.change ?? 0));
+  lines.push(`    ${app.emoji} **${app.appName}**  app链接：[🔗](${app.appStoreUrl})`);
+  lines.push(`        当前排名：**${app.currentRank}名**  (⬆${maxChange})`);
+  lines.push(`        ${app.changes.map(formatChange).join("  |  ")}`);
+  lines.push("");
 }
 
 export async function sendFeishuMessage(message: string): Promise<void> {
@@ -54,18 +74,14 @@ export async function sendFeishuMessage(message: string): Promise<void> {
   const body = {
     msg_type: "interactive",
     card: {
-      header: { title: { tag: "plain_text", content: "📊 游戏下载榜异动警报" }, template: "blue" as const },
+      header: { title: { tag: "plain_text", content: "📊 游戏异动警报" }, template: "blue" as const },
       elements: [{ tag: "markdown", content: message }],
     },
   };
 
   for (let i = 1; i <= MAX_RETRIES; i++) {
     try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const result = (await res.json()) as { StatusCode?: number };
       if (result.StatusCode !== 0) throw new Error("飞书返回错误");

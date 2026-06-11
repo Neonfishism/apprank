@@ -9,6 +9,9 @@ export const MARKETS: Record<string, string> = {
   BR: "巴西", HK: "香港", ID: "印尼", TH: "泰国", PH: "菲律宾",
 };
 
+/** Roblox 作为特殊市场 */
+export const ROBLOX_MARKET = "RB";
+
 export const MARKET_CODES = Object.keys(MARKETS);
 
 export interface RankThreshold { min: number; max: number; threshold: number; }
