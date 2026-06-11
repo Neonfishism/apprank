@@ -46,33 +46,36 @@ async function fetchJson<T>(url: string, retries = MAX_RETRIES): Promise<T> {
 }
 
 /**
- * 批量解析游戏名（每批 20 个 appid）
+ * 批量解析游戏名（单 appid 逐个请求，控制并发）
  */
 async function resolveNames(appIds: number[]): Promise<Map<number, { name: string; publisher: string }>> {
   const result = new Map<number, { name: string; publisher: string }>();
-  const BATCH = 20;
+  const CONCURRENCY = 5;
 
-  for (let i = 0; i < appIds.length; i += BATCH) {
-    const batch = appIds.slice(i, i + BATCH);
-    const ids = batch.join(",");
-    try {
-      const data = await fetchJson<AppDetailResponse>(
-        `${STORE_API}/api/appdetails?appids=${ids}`
-      );
-      for (const [idStr, info] of Object.entries(data)) {
-        if (info.success && info.data) {
-          result.set(parseInt(idStr, 10), {
-            name: info.data.name,
-            publisher: info.data.developers?.[0] || "Steam",
-          });
+  for (let i = 0; i < appIds.length; i += CONCURRENCY) {
+    const batch = appIds.slice(i, i + CONCURRENCY);
+    const tasks = batch.map(async (id) => {
+      try {
+        const data = await fetchJson<AppDetailResponse>(
+          `${STORE_API}/api/appdetails?appids=${id}`
+        );
+        const info = data[id.toString()];
+        if (info?.success && info.data) {
+          return { id, name: info.data.name, publisher: info.data.developers?.[0] || "Steam" } as const;
         }
+      } catch {
+        // 单个失败不中断
       }
-    } catch (err) {
-      console.warn(`  [Steam] 游戏名批量解析失败 (batch ${i / BATCH + 1}): ${(err as Error).message}`);
+      return null;
+    });
+
+    const results = await Promise.all(tasks);
+    for (const r of results) {
+      if (r) result.set(r.id, { name: r.name, publisher: r.publisher });
     }
 
     // 避免频率限制
-    if (i + BATCH < appIds.length) {
+    if (i + CONCURRENCY < appIds.length) {
       await new Promise((r) => setTimeout(r, 400));
     }
   }
