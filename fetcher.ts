@@ -42,15 +42,9 @@ async function fetchWithRetry(url: string, retries = MAX_RETRIES): Promise<strin
   throw new Error("unreachable");
 }
 
-/** 从 entry 中提取 App Store 链接（去除追踪参数） */
-function extractUrl(entry: ITunesEntry): string {
-  const links = Array.isArray(entry.link) ? entry.link : entry.link ? [entry.link] : [];
-  for (const l of links) {
-    if (l?.attributes?.href) {
-      return l.attributes.href.replace(/\?.*$/, "");
-    }
-  }
-  return entry.id?.label || "";
+/** 生成七麦数据链接（网页版 App Store，不受地区限制） */
+function qimaiUrl(appId: number, cc: string): string {
+  return `https://www.qimai.cn/app/rank/appid/${appId}/country/${cc}`;
 }
 
 export async function fetchMarketRankings(
@@ -72,6 +66,6 @@ export async function fetchMarketRankings(
     name: entry["im:name"].label,
     publisher: entry["im:artist"].label,
     category: "游戏",
-    url: extractUrl(entry),
+    url: qimaiUrl(parseInt(entry.id.attributes["im:id"], 10), cc),
   }));
 }
