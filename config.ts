@@ -20,8 +20,9 @@ export const MARKET_CODES = Object.keys(MARKETS);
 export interface RankThreshold { min: number; max: number; threshold: number; }
 export const THRESHOLDS: RankThreshold[] = [
   { min: 1, max: 10, threshold: 3 },
-  { min: 11, max: 50, threshold: 10 },
-  { min: 51, max: 100, threshold: 20 },
+  { min: 11, max: 30, threshold: 10 },
+  { min: 31, max: 60, threshold: 20 },
+  { min: 61, max: 100, threshold: 30 },
 ];
 
 export const COMPARISON_WINDOWS: { days: number; label: string }[] = [
