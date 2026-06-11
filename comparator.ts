@@ -3,7 +3,7 @@
  */
 
 import type { DailySnapshot, AppMeta, RankChange, Anomaly } from "./types.js";
-import { getThreshold, COMPARISON_WINDOWS, MARKETS, ROBLOX_MARKET } from "./config.js";
+import { getThreshold, COMPARISON_WINDOWS, MARKETS, ROBLOX_MARKET, STEAM_MARKET } from "./config.js";
 
 export interface RawAnomaly {
   country: string;
@@ -55,7 +55,7 @@ export function resolveAnomalies(rawAnomalies: RawAnomaly[], metaMap: Map<number
     const meta = metaMap.get(raw.appId);
     return {
       country: raw.country,
-      countryName: raw.country === ROBLOX_MARKET ? "Roblox" : (MARKETS[raw.country] || raw.country),
+      countryName: raw.country === ROBLOX_MARKET ? "Roblox" : raw.country === STEAM_MARKET ? "Steam" : (MARKETS[raw.country] || raw.country),
       appId: raw.appId,
       appName: meta?.name || `App ${raw.appId}`,
       publisherName: meta?.publisher || "未知",

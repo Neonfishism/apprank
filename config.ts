@@ -12,6 +12,9 @@ export const MARKETS: Record<string, string> = {
 /** Roblox 作为特殊市场 */
 export const ROBLOX_MARKET = "RB";
 
+/** Steam 作为特殊市场 */
+export const STEAM_MARKET = "ST";
+
 export const MARKET_CODES = Object.keys(MARKETS);
 
 export interface RankThreshold { min: number; max: number; threshold: number; }

@@ -1,14 +1,15 @@
 /**
  * App 排名异动监控 — 主入口
- * 平台：iOS（16 国游戏下载榜）+ Roblox（在线人数榜）
+ * 平台：iOS（16 国游戏下载榜）+ Roblox（在线人数榜）+ Steam（在线人数榜）
  */
 
 import { fetchMarketRankings } from "./fetcher.js";
 import { fetchRobloxRankings } from "./fetcher-roblox.js";
+import { fetchSteamRankings } from "./fetcher-steam.js";
 import { saveSnapshot, loadSnapshot, buildMarketSnapshot, getDateBefore, getCleanupCutoff, cleanOldSnapshots } from "./snapshot.js";
 import { detectAnomalies, resolveAnomalies } from "./comparator.js";
 import { buildFeishuMessage, sendFeishuMessage } from "./reporter.js";
-import { MARKET_CODES, ROBLOX_MARKET, COMPARISON_WINDOWS } from "./config.js";
+import { MARKET_CODES, ROBLOX_MARKET, STEAM_MARKET, COMPARISON_WINDOWS } from "./config.js";
 import type { DailySnapshot, AppMeta } from "./types.js";
 
 function today(): string { return new Date().toISOString().slice(0, 10); }
@@ -47,6 +48,19 @@ async function main(): Promise<void> {
   } catch (err) {
     fail++;
     console.error(`  ✗ Roblox: ${(err as Error).message}`);
+  }
+
+  // ── Steam ──
+  console.log("[Steam] 拉取在线人数榜...");
+  try {
+    const apps = await fetchSteamRankings();
+    markets[STEAM_MARKET] = buildMarketSnapshot(apps.map((a) => a.app_id));
+    for (const a of apps) metaMap.set(a.app_id, a);
+    ok++;
+    console.log(`  ✓ Steam: ${apps.length} 款`);
+  } catch (err) {
+    fail++;
+    console.error(`  ✗ Steam: ${(err as Error).message}`);
   }
 
   console.log(`\n榜单拉取完成: ${ok} 成功, ${fail} 失败`);
