@@ -53,15 +53,20 @@ export function detectAnomalies(
 export function resolveAnomalies(rawAnomalies: RawAnomaly[], metaMap: Map<number, AppMeta>): Anomaly[] {
   return rawAnomalies.map((raw) => {
     const meta = metaMap.get(raw.appId);
+    const isRB = raw.country === ROBLOX_MARKET;
+    const isST = raw.country === STEAM_MARKET;
     return {
       country: raw.country,
-      countryName: raw.country === ROBLOX_MARKET ? "Roblox" : raw.country === STEAM_MARKET ? "Steam" : (MARKETS[raw.country] || raw.country),
+      countryName: isRB ? "Roblox" : isST ? "Steam" : (MARKETS[raw.country] || raw.country),
       appId: raw.appId,
       appName: meta?.name || `App ${raw.appId}`,
       publisherName: meta?.publisher || "未知",
       category: "游戏",
       currentRank: raw.currentRank,
-      appStoreUrl: meta?.url || "",
+      // iOS 根据异常国家重新生成七麦链接，避免 metaMap 覆盖导致的串区问题
+      appStoreUrl: isRB || isST
+        ? (meta?.url || "")
+        : `https://www.qimai.cn/app/rank/appid/${raw.appId}/country/${raw.country.toLowerCase()}`,
       changes: raw.changes,
       emoji: raw.currentRank <= 10 ? "🚀" : "⬆️",
     };
