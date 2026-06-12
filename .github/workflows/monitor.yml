@@ -26,6 +26,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Setup env
+        run: |
+          echo "FEISHU_WEBHOOK_URL=${{ secrets.FEISHU_WEBHOOK_URL }}" > .env.local
+          echo "STEAM_API_KEY=${{ secrets.STEAM_API_KEY }}" >> .env.local
+
       - name: Run monitor
         run: pnpm start
         env:
