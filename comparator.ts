@@ -3,7 +3,7 @@
  */
 
 import type { DailySnapshot, AppMeta, RankChange, Anomaly } from "./types.js";
-import { getThreshold, COMPARISON_WINDOWS, MARKETS, ROBLOX_MARKET, STEAM_MARKET } from "./config.js";
+import { getThreshold, COMPARISON_WINDOWS, MARKETS, ROBLOX_MARKET, STEAM_MARKET, TOP_N } from "./config.js";
 
 export interface RawAnomaly {
   country: string;
@@ -27,7 +27,11 @@ function computeChanges(
     const snap = historySnapshots.get(days);
     if (!snap) return { windowLabel: label, days, oldRank: null, change: null, triggered: false };
     const oldRank = findRank(snap, country, appId);
-    if (oldRank === null) return { windowLabel: label, days, oldRank: null, change: null, triggered: false };
+    if (oldRank === null) {
+      // 新上榜：视为从榜外（TOP_N 之后）进入
+      const change = TOP_N + 1 - currentRank;
+      return { windowLabel: label, days, oldRank: null, change, triggered: change >= getThreshold(currentRank) };
+    }
     const change = oldRank - currentRank;
     return { windowLabel: label, days, oldRank, change, triggered: change > 0 && change >= getThreshold(currentRank) };
   });

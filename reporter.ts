@@ -80,7 +80,10 @@ function appendApp(lines: string[], app: Anomaly) {
   const maxChange = Math.max(...visibleChanges.map((c) => c.change ?? 0));
   const triggered = visibleChanges
     .filter((c) => c.triggered)
-    .map((c) => `${c.windowLabel} ${c.oldRank}→${app.currentRank}🔥`)
+    .map((c) => {
+      const from = c.oldRank !== null ? `${c.oldRank}→` : "新上榜→";
+      return `${c.windowLabel} ${from}${app.currentRank}🔥`;
+    })
     .join("  |  ");
   lines.push(`    ${app.emoji} **${app.appName}** [🔗](${app.appStoreUrl})  #${app.currentRank}  ⬆${maxChange}  ${triggered}`);
 }
