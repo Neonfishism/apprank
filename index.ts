@@ -8,7 +8,7 @@ import { fetchRobloxRankings } from "./fetcher-roblox.js";
 import { fetchSteamRankings } from "./fetcher-steam.js";
 import { saveSnapshot, loadSnapshot, buildMarketSnapshot, getDateBefore, getCleanupCutoff, cleanOldSnapshots } from "./snapshot.js";
 import { detectAnomalies, resolveAnomalies } from "./comparator.js";
-import { buildFeishuMessage, sendFeishuMessage } from "./reporter.js";
+import { buildFeishuMessage, buildIosMessageChunks, sendFeishuMessage, MAX_MSG_LENGTH } from "./reporter.js";
 import { MARKET_CODES, ROBLOX_MARKET, STEAM_MARKET, SILENT_MARKETS, COMPARISON_WINDOWS } from "./config.js";
 import type { DailySnapshot, AppMeta } from "./types.js";
 
@@ -93,14 +93,18 @@ async function main(): Promise<void> {
       console.log(`  过滤静默市场: ${rawAnomalies.length - pushed.length} 条不推送`);
     }
 
-    // iOS：单独一条消息
+    // iOS：按地区边界拆分成多条消息，避免截断
     const iosPushed = pushed.filter((a) => a.country !== STEAM_MARKET);
     if (iosPushed.length > 0) {
       const iosAnomalies = resolveAnomalies(iosPushed, metaMap);
-      const iosMsg = buildFeishuMessage(iosAnomalies, date);
-      console.log(`\n── iOS 消息 (${iosPushed.length} 条) ──`);
-      console.log(iosMsg);
-      await sendFeishuMessage(iosMsg, "📊 游戏异动警报");
+      const chunks = buildIosMessageChunks(iosAnomalies, date, MAX_MSG_LENGTH);
+      console.log(`\n── iOS 消息 (${iosPushed.length} 条, ${chunks.length} 条消息) ──`);
+      for (let i = 0; i < chunks.length; i++) {
+        console.log(`\n  [消息 ${i+1}/${chunks.length}, ${chunks[i].length} 字符]`);
+        console.log(chunks[i]);
+        const title = chunks.length > 1 ? `📊 游戏异动警报 (${i+1}/${chunks.length})` : "📊 游戏异动警报";
+        await sendFeishuMessage(chunks[i], title);
+      }
     }
 
     // Steam：单独一条消息

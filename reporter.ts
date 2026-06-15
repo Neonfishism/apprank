@@ -37,19 +37,7 @@ export function buildFeishuMessage(anomalies: Anomaly[], date: string): string {
     if (hasContent) lines.push("---");
     hasContent = true;
     lines.push(PLATFORM_LABELS.ios);
-    const byCountry = new Map<string, Anomaly[]>();
-    for (const a of iosAnomalies) {
-      if (!byCountry.has(a.country)) byCountry.set(a.country, []);
-      byCountry.get(a.country)!.push(a);
-    }
-    let firstCountry = true;
-    for (const [country, apps] of byCountry) {
-      if (!firstCountry) lines.push("---");
-      firstCountry = false;
-      apps.sort((a, b) => a.currentRank - b.currentRank);
-      lines.push(`  ${FLAGS[country] || "🏳️"} **${apps[0].countryName}**`);
-      for (const app of apps) appendApp(lines, app);
-    }
+    appendRegionBlocks(lines, iosAnomalies);
   }
 
   // Roblox：单列表
@@ -74,6 +62,75 @@ export function buildFeishuMessage(anomalies: Anomaly[], date: string): string {
   return lines.join("\n");
 }
 
+/** 按国家分组并生成区块文本行 */
+function groupByCountry(anomalies: Anomaly[]): Map<string, Anomaly[]> {
+  const map = new Map<string, Anomaly[]>();
+  for (const a of anomalies) {
+    if (!map.has(a.country)) map.set(a.country, []);
+    map.get(a.country)!.push(a);
+  }
+  return map;
+}
+
+function appendRegionBlocks(lines: string[], anomalies: Anomaly[]) {
+  const byCountry = groupByCountry(anomalies);
+  let firstCountry = true;
+  for (const [country, apps] of byCountry) {
+    if (!firstCountry) lines.push("---");
+    firstCountry = false;
+    apps.sort((a, b) => a.currentRank - b.currentRank);
+    lines.push(`  ${FLAGS[country] || "🏳️"} **${apps[0].countryName}**`);
+    for (const app of apps) appendApp(lines, app);
+  }
+}
+
+/** 将一个国家区块渲染为纯文本（不含前后分隔线） */
+function renderRegionBlock(country: string, apps: Anomaly[]): string {
+  const sorted = [...apps].sort((a, b) => a.currentRank - b.currentRank);
+  const lines: string[] = [];
+  lines.push(`  ${FLAGS[country] || "🏳️"} **${sorted[0].countryName}**`);
+  for (const app of sorted) appendApp(lines, app);
+  return lines.join("\n");
+}
+
+/** 飞书 webhook 消息内容上限 */
+export const MAX_MSG_LENGTH = 18000;
+
+/**
+ * 将 iOS 异动按地区边界拆分成多条消息，避免飞书截断。
+ * 返回完整的 markdown 消息数组。
+ */
+export function buildIosMessageChunks(anomalies: Anomaly[], date: string, maxLen = MAX_MSG_LENGTH): string[] {
+  const byCountry = groupByCountry(anomalies);
+  if (byCountry.size === 0) return [];
+
+  const header = `📊 **游戏异动警报** | ${date}\n\n📱 iOS 游戏榜\n`;
+  const headerLen = header.length;
+  const footer = (count: number) => `---\n共 ${count} 款游戏触发异动`;
+
+  const chunks: string[] = [];
+  let current = header;
+  let count = 0;
+
+  for (const [country, apps] of byCountry) {
+    const block = `---\n${renderRegionBlock(country, apps)}`;
+    if (current.length + block.length + footer(count + apps.length).length + 2 > maxLen && count > 0) {
+      // 当前消息已满，结账
+      chunks.push(current + footer(count));
+      current = header;
+      count = 0;
+    }
+    current += (count === 0 ? "" : "") + block;
+    count += apps.length;
+  }
+
+  if (count > 0) {
+    chunks.push(current + footer(count));
+  }
+
+  return chunks;
+}
+
 function appendApp(lines: string[], app: Anomaly) {
   const visibleChanges = app.changes.filter((c) => !HIDDEN_WINDOWS.has(c.days));
   if (visibleChanges.length === 0) return;
@@ -87,9 +144,6 @@ function appendApp(lines: string[], app: Anomaly) {
     .join("  |  ");
   lines.push(`    ${app.emoji} **${app.appName}** [🔗](${app.appStoreUrl})  #${app.currentRank}  ⬆${maxChange}  ${triggered}`);
 }
-
-/** 飞书 webhook 消息内容上限，超过则截断 */
-const MAX_MSG_LENGTH = 18000;
 
 export async function sendFeishuMessage(message: string, title = "📊 游戏异动警报"): Promise<void> {
   if (!message) { console.log("[reporter] 无消息需要发送"); return; }
