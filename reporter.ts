@@ -158,6 +158,12 @@ export async function sendFeishuMessage(message: string, title = "📊 游戏异
     .filter(Boolean);
   if (urls.length === 0) throw new Error("缺少环境变量 FEISHU_WEBHOOK_URL");
 
+  // 支持多个密钥，按逗号分隔，与 URL 一一对应
+  const secrets = (process.env.FEISHU_SECRET || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
   // 截断过长消息
   let content = message;
   if (content.length > MAX_MSG_LENGTH) {
@@ -168,7 +174,7 @@ export async function sendFeishuMessage(message: string, title = "📊 游戏异
     console.log(`[reporter] 消息过长 (${message.length}→${content.length})，已截断`);
   }
 
-  const body: Record<string, unknown> = {
+  const baseBody: Record<string, unknown> = {
     msg_type: "interactive",
     card: {
       header: { title: { tag: "plain_text", content: title }, template: "blue" as const },
@@ -176,20 +182,14 @@ export async function sendFeishuMessage(message: string, title = "📊 游戏异
     },
   };
 
-  // 签名校验
-  const secret = process.env.FEISHU_SECRET;
-  if (secret) {
-    const timestamp = String(Math.floor(Date.now() / 1000));
-    const stringToSign = `${timestamp}\n${secret}`;
-    body.timestamp = timestamp;
-    body.sign = createHmac("sha256", stringToSign).update("").digest("base64");
-  }
-
-  for (const url of urls) {
+  for (let idx = 0; idx < urls.length; idx++) {
+    const url = urls[idx];
+    const secret = secrets[idx] || "";
+    const signedBody = signBody(baseBody, secret);
     let ok = false;
     for (let i = 1; i <= MAX_RETRIES; i++) {
       try {
-        const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(signedBody) });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const result = (await res.json()) as { StatusCode?: number; code?: number; msg?: string };
         if (result.StatusCode !== 0 && result.code !== 0) {
@@ -207,4 +207,11 @@ export async function sendFeishuMessage(message: string, title = "📊 游戏异
     }
     if (ok) console.log(`[reporter] 飞书消息发送成功 → ${url.slice(-20)}`);
   }
+}
+
+function signBody(body: Record<string, unknown>, secret: string): Record<string, unknown> {
+  if (!secret) return body;
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const stringToSign = `${timestamp}\n${secret}`;
+  return { timestamp, sign: createHmac("sha256", stringToSign).update("").digest("base64"), ...body };
 }
