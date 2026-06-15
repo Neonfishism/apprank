@@ -78,8 +78,11 @@ function appendApp(lines: string[], app: Anomaly) {
 
 export async function sendFeishuMessage(message: string): Promise<void> {
   if (!message) { console.log("[reporter] 无消息需要发送"); return; }
-  const url = process.env.FEISHU_WEBHOOK_URL;
-  if (!url) throw new Error("缺少环境变量 FEISHU_WEBHOOK_URL");
+  const urls = (process.env.FEISHU_WEBHOOK_URL || "")
+    .split(",")
+    .map((u) => u.trim())
+    .filter(Boolean);
+  if (urls.length === 0) throw new Error("缺少环境变量 FEISHU_WEBHOOK_URL");
 
   const body = {
     msg_type: "interactive",
@@ -89,17 +92,24 @@ export async function sendFeishuMessage(message: string): Promise<void> {
     },
   };
 
-  for (let i = 1; i <= MAX_RETRIES; i++) {
-    try {
-      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const result = (await res.json()) as { StatusCode?: number };
-      if (result.StatusCode !== 0) throw new Error("飞书返回错误");
-      console.log("[reporter] 飞书消息发送成功");
-      return;
-    } catch (err) {
-      if (i === MAX_RETRIES) throw err;
-      await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, i - 1)));
+  for (const url of urls) {
+    let ok = false;
+    for (let i = 1; i <= MAX_RETRIES; i++) {
+      try {
+        const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const result = (await res.json()) as { StatusCode?: number };
+        if (result.StatusCode !== 0) throw new Error("飞书返回错误");
+        ok = true;
+        break;
+      } catch (err) {
+        if (i === MAX_RETRIES) {
+          console.error(`[reporter] 飞书发送失败 (${url.slice(-20)}): ${(err as Error).message}`);
+        } else {
+          await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, i - 1)));
+        }
+      }
     }
+    if (ok) console.log(`[reporter] 飞书消息发送成功 → ${url.slice(-20)}`);
   }
 }
