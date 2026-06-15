@@ -35,15 +35,22 @@ export function buildFeishuMessage(anomalies: Anomaly[], date: string): string {
   const rbAnomalies = anomalies.filter((a) => a.country === ROBLOX_MARKET);
   const stAnomalies = anomalies.filter((a) => a.country === STEAM_MARKET);
 
+  let hasContent = false;
+
   // iOS：按国家
   if (iosAnomalies.length > 0) {
+    if (hasContent) lines.push("---");
+    hasContent = true;
     lines.push(PLATFORM_LABELS.ios);
     const byCountry = new Map<string, Anomaly[]>();
     for (const a of iosAnomalies) {
       if (!byCountry.has(a.country)) byCountry.set(a.country, []);
       byCountry.get(a.country)!.push(a);
     }
+    let firstCountry = true;
     for (const [country, apps] of byCountry) {
+      if (!firstCountry) lines.push("---");
+      firstCountry = false;
       apps.sort((a, b) => a.currentRank - b.currentRank);
       lines.push(`  ${FLAGS[country] || "🏳️"} **${apps[0].countryName}**`);
       for (const app of apps) appendApp(lines, app);
@@ -52,6 +59,8 @@ export function buildFeishuMessage(anomalies: Anomaly[], date: string): string {
 
   // Roblox：单列表
   if (rbAnomalies.length > 0) {
+    if (hasContent) lines.push("---");
+    hasContent = true;
     lines.push(PLATFORM_LABELS.roblox);
     rbAnomalies.sort((a, b) => a.currentRank - b.currentRank);
     for (const app of rbAnomalies) appendApp(lines, app);
@@ -59,6 +68,8 @@ export function buildFeishuMessage(anomalies: Anomaly[], date: string): string {
 
   // Steam：单列表
   if (stAnomalies.length > 0) {
+    if (hasContent) lines.push("---");
+    hasContent = true;
     lines.push(PLATFORM_LABELS.steam);
     stAnomalies.sort((a, b) => a.currentRank - b.currentRank);
     for (const app of stAnomalies) appendApp(lines, app);

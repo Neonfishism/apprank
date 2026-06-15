@@ -19,7 +19,7 @@ export const MARKET_CODES = Object.keys(MARKETS);
 
 export interface RankThreshold { min: number; max: number; threshold: number; }
 export const THRESHOLDS: RankThreshold[] = [
-  { min: 1, max: 10, threshold: 3 },
+  { min: 1, max: 10, threshold: 5 },
   { min: 11, max: 30, threshold: 10 },
   { min: 31, max: 60, threshold: 20 },
   { min: 61, max: 100, threshold: 30 },
@@ -37,8 +37,8 @@ export const SNAPSHOT_RETENTION_DAYS = 100;
 export const MAX_RETRIES = 3;
 export const SNAPSHOT_DIR = "snapshots";
 
-/** 不推送的 iOS 市场（数据仍采集） */
-export const SILENT_MARKETS = new Set(["ID", "HK", "PH"]);
+/** 不推送的市场（数据仍采集）。RB = Roblox */
+export const SILENT_MARKETS = new Set(["ID", "HK", "PH", "RB"]);
 
 export function getThreshold(rank: number): number {
   for (const t of THRESHOLDS) if (rank >= t.min && rank <= t.max) return t.threshold;
