@@ -92,10 +92,26 @@ async function main(): Promise<void> {
     if (pushed.length < rawAnomalies.length) {
       console.log(`  过滤静默市场: ${rawAnomalies.length - pushed.length} 条不推送`);
     }
-    const anomalies = resolveAnomalies(pushed, metaMap);
-    const message = buildFeishuMessage(anomalies, date);
-    console.log(message);
-    await sendFeishuMessage(message);
+
+    // iOS：单独一条消息
+    const iosPushed = pushed.filter((a) => a.country !== STEAM_MARKET);
+    if (iosPushed.length > 0) {
+      const iosAnomalies = resolveAnomalies(iosPushed, metaMap);
+      const iosMsg = buildFeishuMessage(iosAnomalies, date);
+      console.log(`\n── iOS 消息 (${iosPushed.length} 条) ──`);
+      console.log(iosMsg);
+      await sendFeishuMessage(iosMsg, "📊 游戏异动警报");
+    }
+
+    // Steam：单独一条消息
+    const stPushed = pushed.filter((a) => a.country === STEAM_MARKET);
+    if (stPushed.length > 0) {
+      const stAnomalies = resolveAnomalies(stPushed, metaMap);
+      const stMsg = buildFeishuMessage(stAnomalies, date);
+      console.log(`\n── Steam 消息 (${stPushed.length} 条) ──`);
+      console.log(stMsg);
+      await sendFeishuMessage(stMsg, "🖥️ Steam 异动警报");
+    }
   } else {
     console.log("  无异动，静默退出");
   }

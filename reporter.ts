@@ -3,7 +3,7 @@
  */
 
 import type { Anomaly } from "./types.js";
-import { MAX_RETRIES, ROBLOX_MARKET, STEAM_MARKET } from "./config.js";
+import { MAX_RETRIES, ROBLOX_MARKET, STEAM_MARKET, HIDDEN_WINDOWS } from "./config.js";
 
 const FLAGS: Record<string, string> = {
   CN: "🇨🇳", TW: "🇹🇼", JP: "🇯🇵", KR: "🇰🇷", SA: "🇸🇦",
@@ -75,8 +75,10 @@ export function buildFeishuMessage(anomalies: Anomaly[], date: string): string {
 }
 
 function appendApp(lines: string[], app: Anomaly) {
-  const maxChange = Math.max(...app.changes.map((c) => c.change ?? 0));
-  const triggered = app.changes
+  const visibleChanges = app.changes.filter((c) => !HIDDEN_WINDOWS.has(c.days));
+  if (visibleChanges.length === 0) return;
+  const maxChange = Math.max(...visibleChanges.map((c) => c.change ?? 0));
+  const triggered = visibleChanges
     .filter((c) => c.triggered)
     .map((c) => `${c.windowLabel} ${c.oldRank}→${app.currentRank}🔥`)
     .join("  |  ");
@@ -86,7 +88,7 @@ function appendApp(lines: string[], app: Anomaly) {
 /** 飞书 webhook 消息内容上限，超过则截断 */
 const MAX_MSG_LENGTH = 18000;
 
-export async function sendFeishuMessage(message: string): Promise<void> {
+export async function sendFeishuMessage(message: string, title = "📊 游戏异动警报"): Promise<void> {
   if (!message) { console.log("[reporter] 无消息需要发送"); return; }
   const urls = (process.env.FEISHU_WEBHOOK_URL || "")
     .split(",")
@@ -107,7 +109,7 @@ export async function sendFeishuMessage(message: string): Promise<void> {
   const body = {
     msg_type: "interactive",
     card: {
-      header: { title: { tag: "plain_text", content: "📊 游戏异动警报" }, template: "blue" as const },
+      header: { title: { tag: "plain_text", content: title }, template: "blue" as const },
       elements: [{ tag: "markdown", content }],
     },
   };

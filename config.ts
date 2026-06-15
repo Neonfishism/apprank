@@ -20,9 +20,9 @@ export const MARKET_CODES = Object.keys(MARKETS);
 export interface RankThreshold { min: number; max: number; threshold: number; }
 export const THRESHOLDS: RankThreshold[] = [
   { min: 1, max: 10, threshold: 5 },
-  { min: 11, max: 30, threshold: 10 },
-  { min: 31, max: 60, threshold: 20 },
-  { min: 61, max: 100, threshold: 30 },
+  { min: 11, max: 30, threshold: 15 },
+  { min: 31, max: 60, threshold: 25 },
+  { min: 61, max: 100, threshold: 35 },
 ];
 
 export const COMPARISON_WINDOWS: { days: number; label: string }[] = [
@@ -31,6 +31,9 @@ export const COMPARISON_WINDOWS: { days: number; label: string }[] = [
   { days: 14, label: "14日前" },
   { days: 30, label: "30日前" },
 ];
+
+/** 不推送的对比窗口天数（数据仍采集，只在消息中隐藏） */
+export const HIDDEN_WINDOWS = new Set([30]);
 
 export const TOP_N = 100;
 export const SNAPSHOT_RETENTION_DAYS = 100;
