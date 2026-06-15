@@ -76,6 +76,9 @@ function appendApp(lines: string[], app: Anomaly) {
   lines.push("");
 }
 
+/** 飞书 webhook 消息内容上限，超过则截断 */
+const MAX_MSG_LENGTH = 18000;
+
 export async function sendFeishuMessage(message: string): Promise<void> {
   if (!message) { console.log("[reporter] 无消息需要发送"); return; }
   const urls = (process.env.FEISHU_WEBHOOK_URL || "")
@@ -84,11 +87,21 @@ export async function sendFeishuMessage(message: string): Promise<void> {
     .filter(Boolean);
   if (urls.length === 0) throw new Error("缺少环境变量 FEISHU_WEBHOOK_URL");
 
+  // 截断过长消息
+  let content = message;
+  if (content.length > MAX_MSG_LENGTH) {
+    content = content.slice(0, MAX_MSG_LENGTH);
+    const lastNewline = content.lastIndexOf("\n");
+    if (lastNewline > 0) content = content.slice(0, lastNewline);
+    content += `\n\n⚠️ 消息过长已截断，完整数据见快照文件`;
+    console.log(`[reporter] 消息过长 (${message.length}→${content.length})，已截断`);
+  }
+
   const body = {
     msg_type: "interactive",
     card: {
       header: { title: { tag: "plain_text", content: "📊 游戏异动警报" }, template: "blue" as const },
-      elements: [{ tag: "markdown", content: message }],
+      elements: [{ tag: "markdown", content }],
     },
   };
 
@@ -98,8 +111,10 @@ export async function sendFeishuMessage(message: string): Promise<void> {
       try {
         const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const result = (await res.json()) as { StatusCode?: number };
-        if (result.StatusCode !== 0) throw new Error("飞书返回错误");
+        const result = (await res.json()) as { StatusCode?: number; code?: number; msg?: string };
+        if (result.StatusCode !== 0 && result.code !== 0) {
+          throw new Error(`飞书返回错误: ${result.msg || JSON.stringify(result)}`);
+        }
         ok = true;
         break;
       } catch (err) {
