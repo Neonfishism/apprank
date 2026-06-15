@@ -9,7 +9,7 @@ import { fetchSteamRankings } from "./fetcher-steam.js";
 import { saveSnapshot, loadSnapshot, buildMarketSnapshot, getDateBefore, getCleanupCutoff, cleanOldSnapshots } from "./snapshot.js";
 import { detectAnomalies, resolveAnomalies } from "./comparator.js";
 import { buildFeishuMessage, sendFeishuMessage } from "./reporter.js";
-import { MARKET_CODES, ROBLOX_MARKET, STEAM_MARKET, COMPARISON_WINDOWS } from "./config.js";
+import { MARKET_CODES, ROBLOX_MARKET, STEAM_MARKET, SILENT_MARKETS, COMPARISON_WINDOWS } from "./config.js";
 import type { DailySnapshot, AppMeta } from "./types.js";
 
 function today(): string { return new Date().toISOString().slice(0, 10); }
@@ -88,7 +88,11 @@ async function main(): Promise<void> {
   // ── 推送 ──
   console.log("\n[步骤5] 推送飞书...");
   if (rawAnomalies.length > 0) {
-    const anomalies = resolveAnomalies(rawAnomalies, metaMap);
+    const pushed = rawAnomalies.filter((a) => !SILENT_MARKETS.has(a.country));
+    if (pushed.length < rawAnomalies.length) {
+      console.log(`  过滤静默市场: ${rawAnomalies.length - pushed.length} 条不推送`);
+    }
+    const anomalies = resolveAnomalies(pushed, metaMap);
     const message = buildFeishuMessage(anomalies, date);
     console.log(message);
     await sendFeishuMessage(message);

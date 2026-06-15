@@ -37,6 +37,9 @@ export const SNAPSHOT_RETENTION_DAYS = 100;
 export const MAX_RETRIES = 3;
 export const SNAPSHOT_DIR = "snapshots";
 
+/** 不推送的 iOS 市场（数据仍采集） */
+export const SILENT_MARKETS = new Set(["ID", "HK", "PH"]);
+
 export function getThreshold(rank: number): number {
   for (const t of THRESHOLDS) if (rank >= t.min && rank <= t.max) return t.threshold;
   return Infinity;
