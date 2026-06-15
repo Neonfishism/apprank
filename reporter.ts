@@ -111,17 +111,21 @@ export function buildIosMessageChunks(anomalies: Anomaly[], date: string, maxLen
   const chunks: string[] = [];
   let current = header;
   let count = 0;
+  let firstInChunk = true;
 
   for (const [country, apps] of byCountry) {
-    const block = `---\n${renderRegionBlock(country, apps)}`;
+    let block = `${firstInChunk ? "" : "\n---\n"}${renderRegionBlock(country, apps)}`;
     if (current.length + block.length + footer(count + apps.length).length + 2 > maxLen && count > 0) {
       // 当前消息已满，结账
       chunks.push(current + footer(count));
       current = header;
       count = 0;
+      firstInChunk = true;
+      block = renderRegionBlock(country, apps); // 新消息第一个地区，不加 ---
     }
-    current += (count === 0 ? "" : "") + block;
+    current += block;
     count += apps.length;
+    firstInChunk = false;
   }
 
   if (count > 0) {
