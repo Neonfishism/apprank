@@ -30,12 +30,14 @@ jobs:
         run: |
           echo "FEISHU_WEBHOOK_URL=${{ secrets.FEISHU_WEBHOOK_URL }}" > .env.local
           echo "STEAM_API_KEY=${{ secrets.STEAM_API_KEY }}" >> .env.local
+          echo "FEISHU_SECRET=${{ secrets.FEISHU_SECRET }}" >> .env.local
 
       - name: Run monitor
         run: pnpm start
         env:
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
           STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
+          FEISHU_SECRET: ${{ secrets.FEISHU_SECRET }}
 
       - name: Commit snapshot
         run: |

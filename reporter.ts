@@ -4,6 +4,7 @@
 
 import type { Anomaly } from "./types.js";
 import { MAX_RETRIES, ROBLOX_MARKET, STEAM_MARKET, HIDDEN_WINDOWS } from "./config.js";
+import { createHmac } from "crypto";
 
 const FLAGS: Record<string, string> = {
   CN: "🇨🇳", TW: "🇹🇼", JP: "🇯🇵", KR: "🇰🇷", SA: "🇸🇦",
@@ -167,13 +168,22 @@ export async function sendFeishuMessage(message: string, title = "📊 游戏异
     console.log(`[reporter] 消息过长 (${message.length}→${content.length})，已截断`);
   }
 
-  const body = {
+  const body: Record<string, unknown> = {
     msg_type: "interactive",
     card: {
       header: { title: { tag: "plain_text", content: title }, template: "blue" as const },
       elements: [{ tag: "markdown", content }],
     },
   };
+
+  // 签名校验
+  const secret = process.env.FEISHU_SECRET;
+  if (secret) {
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const stringToSign = `${timestamp}\n${secret}`;
+    body.timestamp = timestamp;
+    body.sign = createHmac("sha256", stringToSign).update("").digest("base64");
+  }
 
   for (const url of urls) {
     let ok = false;
