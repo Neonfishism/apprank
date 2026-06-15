@@ -9,13 +9,22 @@ import { fetchSteamRankings } from "./fetcher-steam.js";
 import { saveSnapshot, loadSnapshot, buildMarketSnapshot, getDateBefore, getCleanupCutoff, cleanOldSnapshots } from "./snapshot.js";
 import { detectAnomalies, resolveAnomalies } from "./comparator.js";
 import { buildFeishuMessage, buildIosMessageChunks, sendFeishuMessage, MAX_MSG_LENGTH } from "./reporter.js";
-import { MARKET_CODES, ROBLOX_MARKET, STEAM_MARKET, SILENT_MARKETS, COMPARISON_WINDOWS } from "./config.js";
+import { MARKET_CODES, ROBLOX_MARKET, STEAM_MARKET, SILENT_MARKETS, COMPARISON_WINDOWS, SNAPSHOT_DIR } from "./config.js";
 import type { DailySnapshot, AppMeta } from "./types.js";
+import { existsSync } from "fs";
+import { join } from "path";
 
 function today(): string { return new Date().toISOString().slice(0, 10); }
 
 async function main(): Promise<void> {
   const date = today();
+
+  // 非 GitHub Actions：当天已拉取过快照则跳过，避免测试重复推送刷屏
+  if (!process.env.GITHUB_ACTIONS && existsSync(join(SNAPSHOT_DIR, `${date}.json`))) {
+    console.log(`[跳过] 今日快照已存在，非 Actions 环境跳过重复推送。若需强制推送请删除 snapshots/${date}.json`);
+    return;
+  }
+
   console.log(`\n======== 游戏异动监控 | ${date} ========\n`);
 
   const markets: DailySnapshot["markets"] = {};
@@ -128,5 +137,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => { console.error("\n❌ 执行失败:", err); }).finally(() => {
-  if (!process.env.CI) setInterval(() => {}, 3600_000);
+  // 本地运行直接退出，GitHub Actions 由 workflow 控制
+  if (!process.env.GITHUB_ACTIONS) process.exit(0);
 });
