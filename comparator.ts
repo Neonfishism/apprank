@@ -25,7 +25,7 @@ function computeChanges(
 ): RankChange[] {
   return COMPARISON_WINDOWS.map(({ days, label }) => {
     const snap = historySnapshots.get(days);
-    if (!snap) return { windowLabel: label, days, oldRank: null, change: null, triggered: false };
+    if (!snap || !snap.markets[country]) return { windowLabel: label, days, oldRank: null, change: null, triggered: false };
     const oldRank = findRank(snap, country, appId);
     if (oldRank === null) {
       // 新上榜：视为从榜外（TOP_N 之后）进入
