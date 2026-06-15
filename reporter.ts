@@ -2,7 +2,7 @@
  * 推送模块 — 飞书消息组装与发送
  */
 
-import type { Anomaly, RankChange } from "./types.js";
+import type { Anomaly } from "./types.js";
 import { MAX_RETRIES, ROBLOX_MARKET, STEAM_MARKET } from "./config.js";
 
 const FLAGS: Record<string, string> = {
@@ -13,11 +13,6 @@ const FLAGS: Record<string, string> = {
   ST: "🖥️",
 };
 
-function formatChange(c: RankChange): string {
-  if (c.oldRank === null || c.change === null) return `${c.windowLabel}  ——`;
-  const arrow = c.change > 0 ? "⬆" : c.change < 0 ? "⬇" : "→";
-  return `${c.windowLabel}  ${c.oldRank}→${c.oldRank - (c.change ?? 0)}  ${arrow}${Math.abs(c.change)}${c.triggered ? "🔥" : ""}`;
-}
 
 const PLATFORM_LABELS: Record<string, string> = {
   ios: "📱 iOS 游戏榜",
@@ -81,10 +76,11 @@ export function buildFeishuMessage(anomalies: Anomaly[], date: string): string {
 
 function appendApp(lines: string[], app: Anomaly) {
   const maxChange = Math.max(...app.changes.map((c) => c.change ?? 0));
-  lines.push(`    ${app.emoji} **${app.appName}**  app链接：[🔗](${app.appStoreUrl})`);
-  lines.push(`        当前排名：**${app.currentRank}名**  (⬆${maxChange})`);
-  lines.push(`        ${app.changes.map(formatChange).join("  |  ")}`);
-  lines.push("");
+  const triggered = app.changes
+    .filter((c) => c.triggered)
+    .map((c) => `${c.windowLabel} ${c.oldRank}→${app.currentRank}🔥`)
+    .join("  |  ");
+  lines.push(`    ${app.emoji} **${app.appName}** [🔗](${app.appStoreUrl})  #${app.currentRank}  ⬆${maxChange}  ${triggered}`);
 }
 
 /** 飞书 webhook 消息内容上限，超过则截断 */
