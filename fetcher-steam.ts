@@ -95,9 +95,9 @@ export async function fetchSteamRankings(): Promise<
 
   if (!charts?.response?.ranks) throw new Error("Steam API 返回异常");
 
-  // 按 rank 排序取 Top N
+  // 按昨日峰值在线人数排序取 Top N，比实时人数更稳定
   const sorted = charts.response.ranks
-    .sort((a, b) => a.rank - b.rank)
+    .sort((a, b) => b.peak_in_game - a.peak_in_game)
     .slice(0, TOP_N);
 
   const appIds = sorted.map((r) => r.appid);
