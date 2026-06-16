@@ -147,7 +147,11 @@ function appendApp(lines: string[], app: Anomaly) {
       return `${c.windowLabel} ${from}${app.currentRank}🔥`;
     })
     .join("  |  ");
-  lines.push(`    ${app.emoji} **${app.appName}** [🔗](${app.appStoreUrl})  #${app.currentRank}  ⬆${maxChange}  ${triggered}`);
+
+  // 红字加粗：1-60名增长>50 或 61-100名增长>80
+  const isRed = (app.currentRank <= 60 && maxChange > 50) || (app.currentRank > 60 && maxChange > 80);
+  const line = `    ${app.emoji} **${app.appName}** [🔗](${app.appStoreUrl})  #${app.currentRank}  ⬆${maxChange}  ${triggered}`;
+  lines.push(isRed ? `<font color='red'>**${line.trim()}**</font>` : line);
 }
 
 export async function sendFeishuMessage(message: string, title = "📊 游戏异动警报"): Promise<void> {

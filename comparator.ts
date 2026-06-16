@@ -72,7 +72,7 @@ export function resolveAnomalies(rawAnomalies: RawAnomaly[], metaMap: Map<number
         ? (meta?.url || "")
         : `https://www.qimai.cn/app/rank/appid/${raw.appId}/country/${raw.country.toLowerCase()}`,
       changes: raw.changes,
-      emoji: raw.currentRank <= 10 ? "🚀" : "⬆️",
+      emoji: "⬆",
     };
   });
 }
