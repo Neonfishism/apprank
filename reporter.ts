@@ -155,7 +155,8 @@ function appendApp(lines: string[], app: Anomaly) {
   // 红字加粗：按增长前名次判断 — 1-60名增长>50 或 61-100名增长>80
   const oldRank = maxOldRank ?? app.currentRank;
   const isRed = (oldRank <= 60 && maxChange > 50) || (oldRank > 60 && maxChange > 80);
-  const line = `⬆ **${app.appName}** [🔗](${app.appStoreUrl})  #${app.currentRank}  ⬆${maxChange}  ${triggered}`;
+  const icon = isRed ? "🚀" : "⬆";
+  const line = `${icon} **${app.appName}** [🔗](${app.appStoreUrl})  #${app.currentRank}  ⬆${maxChange}  ${triggered}`;
   lines.push(isRed ? `    <font color='red'>${line}</font>` : `    ${line}`);
 }
 

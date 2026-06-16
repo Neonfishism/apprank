@@ -111,7 +111,7 @@ async function main(): Promise<void> {
       for (let i = 0; i < chunks.length; i++) {
         console.log(`\n  [消息 ${i+1}/${chunks.length}, ${chunks[i].length} 字符]`);
         console.log(chunks[i]);
-        const title = chunks.length > 1 ? `📊 游戏异动警报 (${i+1}/${chunks.length})` : "📊 游戏异动警报";
+        const title = chunks.length > 1 ? `📱 iOS异动警告 (${i+1}/${chunks.length})` : "📱 iOS异动警告";
         await sendFeishuMessage(chunks[i], title);
       }
     }
