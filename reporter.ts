@@ -139,7 +139,11 @@ export function buildIosMessageChunks(anomalies: Anomaly[], date: string, maxLen
 function appendApp(lines: string[], app: Anomaly) {
   const visibleChanges = app.changes.filter((c) => !HIDDEN_WINDOWS.has(c.days));
   if (visibleChanges.length === 0) return;
-  const maxChange = Math.max(...visibleChanges.map((c) => c.change ?? 0));
+  let maxChange = 0;
+  let maxOldRank: number | null = null;
+  for (const c of visibleChanges) {
+    if ((c.change ?? 0) > maxChange) { maxChange = c.change!; maxOldRank = c.oldRank; }
+  }
   const triggered = visibleChanges
     .filter((c) => c.triggered)
     .map((c) => {
@@ -148,10 +152,11 @@ function appendApp(lines: string[], app: Anomaly) {
     })
     .join("  |  ");
 
-  // 红字加粗：1-60名增长>50 或 61-100名增长>80
-  const isRed = (app.currentRank <= 60 && maxChange > 50) || (app.currentRank > 60 && maxChange > 80);
-  const line = `    ${app.emoji} **${app.appName}** [🔗](${app.appStoreUrl})  #${app.currentRank}  ⬆${maxChange}  ${triggered}`;
-  lines.push(isRed ? `<font color='red'>**${line.trim()}**</font>` : line);
+  // 红字加粗：按增长前名次判断 — 1-60名增长>50 或 61-100名增长>80
+  const oldRank = maxOldRank ?? app.currentRank;
+  const isRed = (oldRank <= 60 && maxChange > 50) || (oldRank > 60 && maxChange > 80);
+  const line = `⬆ **${app.appName}** [🔗](${app.appStoreUrl})  #${app.currentRank}  ⬆${maxChange}  ${triggered}`;
+  lines.push(isRed ? `    <font color='red'>${line}</font>` : `    ${line}`);
 }
 
 export async function sendFeishuMessage(message: string, title = "📊 游戏异动警报"): Promise<void> {
