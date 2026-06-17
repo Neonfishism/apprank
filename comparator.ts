@@ -26,6 +26,10 @@ function computeChanges(
   return COMPARISON_WINDOWS.map(({ days, label }) => {
     const snap = historySnapshots.get(days);
     if (!snap || !snap.markets[country]) return { windowLabel: label, days, oldRank: null, change: null, triggered: false };
+    // 健康检查标记：如果该市场在旧快照中被标记为不可靠，跳过
+    if ((snap as any)._unreliableMarkets?.has(country)) {
+      return { windowLabel: label, days, oldRank: null, change: null, triggered: false };
+    }
     const oldRank = findRank(snap, country, appId);
     if (oldRank === null) {
       // 新上榜：视为从榜外（TOP_N 之后）进入
@@ -41,6 +45,27 @@ export function detectAnomalies(
   today: DailySnapshot,
   historySnapshots: Map<number, DailySnapshot | null>
 ): RawAnomaly[] {
+  // 对每个对比窗口做一次健康检查：如果某市场新旧快照的 app 重叠度 < 20%，
+  // 说明旧快照可能损坏（早期工具版本 appId 格式不兼容），打出告警
+  for (const [days, snap] of historySnapshots) {
+    if (!snap) continue;
+    for (const [country, market] of Object.entries(today.markets)) {
+      const oldMarket = snap.markets[country];
+      if (!oldMarket) continue;
+      const oldIds = new Set(oldMarket.apps.map((a) => a.app_id));
+      const newIds = new Set(market.apps.map((a) => a.app_id));
+      let overlap = 0;
+      for (const id of oldIds) if (newIds.has(id)) overlap++;
+      const pct = Math.round((overlap / Math.max(oldIds.size, 1)) * 100);
+      if (pct < 20) {
+        console.warn(`[comparator] ⚠️ 健康检查失败: ${country} ${days}日前 快照重叠度仅 ${pct}%，可能损坏，跳过该窗口`);
+        // 将该窗口对该市场标记为"不可用"
+        (snap as any)._unreliableMarkets ??= new Set();
+        (snap as any)._unreliableMarkets.add(country);
+      }
+    }
+  }
+
   const anomalies: RawAnomaly[] = [];
   for (const [country, market] of Object.entries(today.markets)) {
     for (let i = 0; i < market.apps.length; i++) {
