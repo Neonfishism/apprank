@@ -6,15 +6,6 @@ import type { Anomaly } from "./types.js";
 import { MAX_RETRIES, ROBLOX_MARKET, STEAM_MARKET, HIDDEN_WINDOWS } from "./config.js";
 import { createHmac } from "crypto";
 
-const FLAGS: Record<string, string> = {
-  CN: "🇨🇳", TW: "🇹🇼", JP: "🇯🇵", KR: "🇰🇷", SA: "🇸🇦",
-  TR: "🇹🇷", RU: "🇷🇺", DE: "🇩🇪", FR: "🇫🇷", IT: "🇮🇹", US: "🇺🇸",
-  BR: "🇧🇷", HK: "🇭🇰", ID: "🇮🇩", TH: "🇹🇭", PH: "🇵🇭",
-  RB: "🎮",
-  ST: "🖥️",
-};
-
-
 const PLATFORM_LABELS: Record<string, string> = {
   ios: "📱 iOS 游戏榜",
   roblox: "🎮 Roblox 在线榜",
@@ -80,7 +71,7 @@ function appendRegionBlocks(lines: string[], anomalies: Anomaly[]) {
     if (!firstCountry) lines.push("---");
     firstCountry = false;
     apps.sort((a, b) => a.currentRank - b.currentRank);
-    lines.push(`  ${FLAGS[country] || "🏳️"} **${apps[0].countryName}**`);
+    lines.push(`  <font color='#1E90FF'>**${apps[0].countryName}**</font>`);
     for (const app of apps) appendApp(lines, app);
   }
 }
@@ -89,7 +80,7 @@ function appendRegionBlocks(lines: string[], anomalies: Anomaly[]) {
 function renderRegionBlock(country: string, apps: Anomaly[]): string {
   const sorted = [...apps].sort((a, b) => a.currentRank - b.currentRank);
   const lines: string[] = [];
-  lines.push(`  ${FLAGS[country] || "🏳️"} **${sorted[0].countryName}**`);
+  lines.push(`  <font color='#1E90FF'>**${sorted[0].countryName}**</font>`);
   for (const app of sorted) appendApp(lines, app);
   return lines.join("\n");
 }
