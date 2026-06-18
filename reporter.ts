@@ -71,7 +71,7 @@ function appendRegionBlocks(lines: string[], anomalies: Anomaly[]) {
     if (!firstCountry) lines.push("---");
     firstCountry = false;
     apps.sort((a, b) => a.currentRank - b.currentRank);
-    lines.push(`  <font color='#1E90FF'>**${apps[0].countryName}**</font>`);
+    lines.push(`  <font color='blue'>**${apps[0].countryName}**</font>`);
     for (const app of apps) appendApp(lines, app);
   }
 }
@@ -80,7 +80,7 @@ function appendRegionBlocks(lines: string[], anomalies: Anomaly[]) {
 function renderRegionBlock(country: string, apps: Anomaly[]): string {
   const sorted = [...apps].sort((a, b) => a.currentRank - b.currentRank);
   const lines: string[] = [];
-  lines.push(`  <font color='#1E90FF'>**${sorted[0].countryName}**</font>`);
+  lines.push(`  <font color='blue'>**${sorted[0].countryName}**</font>`);
   for (const app of sorted) appendApp(lines, app);
   return lines.join("\n");
 }
