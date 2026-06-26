@@ -12,49 +12,41 @@ const PLATFORM_LABELS: Record<string, string> = {
   steam: "🖥️ Steam 在线榜",
 };
 
-export function buildFeishuMessage(anomalies: Anomaly[], date: string): string {
-  if (anomalies.length === 0) return "";
+export const MAX_MSG_LENGTH = 18000;
 
-  const lines: string[] = [`📊 **游戏异动警报** | ${date}\n`];
+// ── 工具函数：游戏行构建 ──
 
-  // 按平台分组
-  const iosAnomalies = anomalies.filter((a) => a.country !== ROBLOX_MARKET && a.country !== STEAM_MARKET);
-  const rbAnomalies = anomalies.filter((a) => a.country === ROBLOX_MARKET);
-  const stAnomalies = anomalies.filter((a) => a.country === STEAM_MARKET);
-
-  let hasContent = false;
-
-  // iOS：按国家
-  if (iosAnomalies.length > 0) {
-    if (hasContent) lines.push("---");
-    hasContent = true;
-    lines.push(PLATFORM_LABELS.ios);
-    appendRegionBlocks(lines, iosAnomalies);
+/** 构建单款游戏的异动行文本（不含缩进） */
+function buildAppLine(app: Anomaly): string {
+  const visibleChanges = app.changes.filter((c) => !HIDDEN_WINDOWS.has(c.days));
+  if (visibleChanges.length === 0) return "";
+  let maxChange = 0;
+  let maxOldRank: number | null = null;
+  for (const c of visibleChanges) {
+    if ((c.change ?? 0) > maxChange) { maxChange = c.change!; maxOldRank = c.oldRank; }
   }
+  const triggered = visibleChanges
+    .filter((c) => c.triggered)
+    .map((c) => {
+      const from = c.oldRank !== null ? `${c.oldRank}→` : "新上榜→";
+      return `${c.windowLabel} ${from}${app.currentRank}🔥`;
+    })
+    .join("  |  ");
 
-  // Roblox：单列表
-  if (rbAnomalies.length > 0) {
-    if (hasContent) lines.push("---");
-    hasContent = true;
-    lines.push(PLATFORM_LABELS.roblox);
-    rbAnomalies.sort((a, b) => a.currentRank - b.currentRank);
-    for (const app of rbAnomalies) appendApp(lines, app);
-  }
-
-  // Steam：单列表
-  if (stAnomalies.length > 0) {
-    if (hasContent) lines.push("---");
-    hasContent = true;
-    lines.push(PLATFORM_LABELS.steam);
-    stAnomalies.sort((a, b) => a.currentRank - b.currentRank);
-    for (const app of stAnomalies) appendApp(lines, app);
-  }
-
-  lines.push(`---\n共 ${anomalies.length} 款游戏触发异动`);
-  return lines.join("\n");
+  // 红字规则：增长前名次 ≤60 且升幅 >50，或 >60 且升幅 >80
+  const oldRank = maxOldRank ?? app.currentRank;
+  const isRed = (oldRank <= 60 && maxChange > 50) || (oldRank > 60 && maxChange > 80);
+  const icon = isRed ? "🚀" : "⬆";
+  const line = `${icon} **${app.appName}** [🔗](${app.appStoreUrl})  #${app.currentRank}  ⬆${maxChange}  ${triggered}`;
+  return isRed ? `<font color='red'>${line}</font>` : line;
 }
 
-/** 按国家分组并生成区块文本行 */
+function appendApp(lines: string[], app: Anomaly) {
+  const line = buildAppLine(app);
+  if (line) lines.push(`    ${line}`);
+}
+
+/** 按国家分组 */
 function groupByCountry(anomalies: Anomaly[]): Map<string, Anomaly[]> {
   const map = new Map<string, Anomaly[]>();
   for (const a of anomalies) {
@@ -76,7 +68,6 @@ function appendRegionBlocks(lines: string[], anomalies: Anomaly[]) {
   }
 }
 
-/** 将一个国家区块渲染为纯文本（不含前后分隔线） */
 function renderRegionBlock(country: string, apps: Anomaly[]): string {
   const sorted = [...apps].sort((a, b) => a.currentRank - b.currentRank);
   const lines: string[] = [];
@@ -85,19 +76,51 @@ function renderRegionBlock(country: string, apps: Anomaly[]): string {
   return lines.join("\n");
 }
 
-/** 飞书 webhook 消息内容上限 */
-export const MAX_MSG_LENGTH = 18000;
+// ── 消息构建 (旧格式，Steam 仍用) ──
 
-/**
- * 将 iOS 异动按地区边界拆分成多条消息，避免飞书截断。
- * 返回完整的 markdown 消息数组。
- */
+export function buildFeishuMessage(anomalies: Anomaly[], date: string): string {
+  if (anomalies.length === 0) return "";
+
+  const lines: string[] = [`📊 **游戏异动警报** | ${date}\n`];
+
+  const iosAnomalies = anomalies.filter((a) => a.country !== ROBLOX_MARKET && a.country !== STEAM_MARKET);
+  const rbAnomalies = anomalies.filter((a) => a.country === ROBLOX_MARKET);
+  const stAnomalies = anomalies.filter((a) => a.country === STEAM_MARKET);
+
+  let hasContent = false;
+
+  if (iosAnomalies.length > 0) {
+    if (hasContent) lines.push("---");
+    hasContent = true;
+    lines.push(PLATFORM_LABELS.ios);
+    appendRegionBlocks(lines, iosAnomalies);
+  }
+
+  if (rbAnomalies.length > 0) {
+    if (hasContent) lines.push("---");
+    hasContent = true;
+    lines.push(PLATFORM_LABELS.roblox);
+    rbAnomalies.sort((a, b) => a.currentRank - b.currentRank);
+    for (const app of rbAnomalies) appendApp(lines, app);
+  }
+
+  if (stAnomalies.length > 0) {
+    if (hasContent) lines.push("---");
+    hasContent = true;
+    lines.push(PLATFORM_LABELS.steam);
+    stAnomalies.sort((a, b) => a.currentRank - b.currentRank);
+    for (const app of stAnomalies) appendApp(lines, app);
+  }
+
+  lines.push(`---\n共 ${anomalies.length} 款游戏触发异动`);
+  return lines.join("\n");
+}
+
 export function buildIosMessageChunks(anomalies: Anomaly[], date: string, maxLen = MAX_MSG_LENGTH): string[] {
   const byCountry = groupByCountry(anomalies);
   if (byCountry.size === 0) return [];
 
   const header = `📊 **游戏异动警报** | ${date}\n\n📱 iOS 游戏榜\n`;
-  const headerLen = header.length;
   const footer = (count: number) => `---\n共 ${count} 款游戏触发异动`;
 
   const chunks: string[] = [];
@@ -108,85 +131,122 @@ export function buildIosMessageChunks(anomalies: Anomaly[], date: string, maxLen
   for (const [country, apps] of byCountry) {
     let block = `${firstInChunk ? "" : "\n---\n"}${renderRegionBlock(country, apps)}`;
     if (current.length + block.length + footer(count + apps.length).length + 2 > maxLen && count > 0) {
-      // 当前消息已满，结账
       chunks.push(current + footer(count));
       current = header;
       count = 0;
       firstInChunk = true;
-      block = renderRegionBlock(country, apps); // 新消息第一个地区，不加 ---
+      block = renderRegionBlock(country, apps);
     }
     current += block;
     count += apps.length;
     firstInChunk = false;
   }
 
-  if (count > 0) {
-    chunks.push(current + footer(count));
-  }
-
+  if (count > 0) chunks.push(current + footer(count));
   return chunks;
 }
 
-function appendApp(lines: string[], app: Anomaly) {
-  const visibleChanges = app.changes.filter((c) => !HIDDEN_WINDOWS.has(c.days));
-  if (visibleChanges.length === 0) return;
-  let maxChange = 0;
-  let maxOldRank: number | null = null;
-  for (const c of visibleChanges) {
-    if ((c.change ?? 0) > maxChange) { maxChange = c.change!; maxOldRank = c.oldRank; }
-  }
-  const triggered = visibleChanges
-    .filter((c) => c.triggered)
-    .map((c) => {
-      const from = c.oldRank !== null ? `${c.oldRank}→` : "新上榜→";
-      return `${c.windowLabel} ${from}${app.currentRank}🔥`;
-    })
-    .join("  |  ");
+// ── 折叠卡片构建 (新格式，iOS 用) ──
 
-  // 红字加粗：按增长前名次判断 — 1-60名增长>50 或 61-100名增长>80
-  const oldRank = maxOldRank ?? app.currentRank;
-  const isRed = (oldRank <= 60 && maxChange > 50) || (oldRank > 60 && maxChange > 80);
-  const icon = isRed ? "🚀" : "⬆";
-  const line = `${icon} **${app.appName}** [🔗](${app.appStoreUrl})  #${app.currentRank}  ⬆${maxChange}  ${triggered}`;
-  lines.push(isRed ? `    <font color='red'>${line}</font>` : `    ${line}`);
+const MAX_COUNTRIES_PER_CARD = 8;
+
+/**
+ * 构建 iOS 折叠卡片消息。
+ * 每个国家一个 collapsible_panel，标题显示摘要，点击展开查看游戏列表。
+ * 返回多个卡片的 elements 配置数组（超过上限时自动分卡）。
+ */
+export function buildIosCollapsibleCards(
+  anomalies: Anomaly[],
+  date: string
+): Array<{ title: string; elements: unknown[] }> {
+  const byCountry = groupByCountry(anomalies);
+  if (byCountry.size === 0) return [];
+
+  const sortedCountries = [...byCountry.entries()]
+    .sort((a, b) => b[1].length - a[1].length);
+
+  const totalCards = Math.ceil(sortedCountries.length / MAX_COUNTRIES_PER_CARD);
+  const cards: Array<{ title: string; elements: unknown[] }> = [];
+
+  for (let cardIdx = 0; cardIdx < totalCards; cardIdx++) {
+    const start = cardIdx * MAX_COUNTRIES_PER_CARD;
+    const slice = sortedCountries.slice(start, start + MAX_COUNTRIES_PER_CARD);
+    const cardGameCount = slice.reduce((sum, [, apps]) => sum + apps.length, 0);
+
+    const panels: unknown[] = [];
+    const suffix = totalCards > 1 ? ` (${cardIdx + 1}/${totalCards})` : "";
+    panels.push({
+      tag: "markdown",
+      content: `📊 **游戏异动警报** | ${date}${suffix}\n\n📱 iOS 游戏榜 — ${slice.length} 个地区，共 ${cardGameCount} 款游戏`,
+    });
+
+    for (const [country, apps] of slice) {
+      const sorted = [...apps].sort((a, b) => a.currentRank - b.currentRank);
+      const countryName = sorted[0].countryName;
+
+      let maxChange = 0;
+      let hasRocket = false;
+      for (const app of sorted) {
+        const visible = app.changes.filter((c) => !HIDDEN_WINDOWS.has(c.days));
+        for (const c of visible) {
+          const ch = c.change ?? 0;
+          if (ch > maxChange) maxChange = ch;
+          const oldRank = c.oldRank ?? app.currentRank;
+          if ((oldRank <= 60 && ch > 50) || (oldRank > 60 && ch > 80)) hasRocket = true;
+        }
+      }
+
+      const rocketIcon = hasRocket ? "🚀" : "⬆";
+      const title = `${rocketIcon} ${countryName} (${sorted.length}款) ▲最多${maxChange}`;
+
+      const contentLines: string[] = [];
+      for (const app of sorted) {
+        const line = buildAppLine(app);
+        if (line) contentLines.push(`    ${line}`);
+      }
+
+      panels.push({
+        tag: "collapsible_panel",
+        expanded: false,
+        header: {
+          title: { tag: "plain_text", content: title },
+          icon: { tag: "standard_icon", token: "down-small-ccm_outlined", size: "16px 16px" },
+          icon_position: "right" as const,
+          icon_expanded_angle: -180,
+        },
+        border: { color: "grey", corner_radius: "5px" },
+        elements: [{ tag: "markdown", content: contentLines.join("\n") }],
+      });
+    }
+
+    cards.push({
+      title: `📱 iOS 游戏异动警报${suffix} | ${date}`,
+      elements: panels,
+    });
+  }
+
+  return cards;
 }
 
-export async function sendFeishuMessage(message: string, title = "📊 游戏异动警报"): Promise<void> {
-  if (!message) { console.log("[reporter] 无消息需要发送"); return; }
+// ── 飞书发送 ──
+
+/** 底层发送：签名 + 多 webhook 重试 */
+async function _sendCardBody(body: Record<string, unknown>): Promise<void> {
   const urls = (process.env.FEISHU_WEBHOOK_URL || "")
     .split(",")
     .map((u) => u.trim())
     .filter(Boolean);
   if (urls.length === 0) throw new Error("缺少环境变量 FEISHU_WEBHOOK_URL");
 
-  // 支持多个密钥，按逗号分隔，与 URL 一一对应
   const secrets = (process.env.FEISHU_SECRET || "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
 
-  // 截断过长消息
-  let content = message;
-  if (content.length > MAX_MSG_LENGTH) {
-    content = content.slice(0, MAX_MSG_LENGTH);
-    const lastNewline = content.lastIndexOf("\n");
-    if (lastNewline > 0) content = content.slice(0, lastNewline);
-    content += `\n\n⚠️ 消息过长已截断，完整数据见快照文件`;
-    console.log(`[reporter] 消息过长 (${message.length}→${content.length})，已截断`);
-  }
-
-  const baseBody: Record<string, unknown> = {
-    msg_type: "interactive",
-    card: {
-      header: { title: { tag: "plain_text", content: title }, template: "blue" as const },
-      elements: [{ tag: "markdown", content }],
-    },
-  };
-
   for (let idx = 0; idx < urls.length; idx++) {
     const url = urls[idx];
     const secret = secrets[idx] || "";
-    const signedBody = signBody(baseBody, secret);
+    const signedBody = signBody(body, secret);
     let ok = false;
     for (let i = 1; i <= MAX_RETRIES; i++) {
       try {
@@ -208,6 +268,37 @@ export async function sendFeishuMessage(message: string, title = "📊 游戏异
     }
     if (ok) console.log(`[reporter] 飞书消息发送成功 → ${url.slice(-20)}`);
   }
+}
+
+export async function sendFeishuMessage(message: string, title = "📊 游戏异动警报"): Promise<void> {
+  if (!message) { console.log("[reporter] 无消息需要发送"); return; }
+
+  let content = message;
+  if (content.length > MAX_MSG_LENGTH) {
+    content = content.slice(0, MAX_MSG_LENGTH);
+    const lastNewline = content.lastIndexOf("\n");
+    if (lastNewline > 0) content = content.slice(0, lastNewline);
+    content += `\n\n⚠️ 消息过长已截断，完整数据见快照文件`;
+    console.log(`[reporter] 消息过长 (${message.length}→${content.length})，已截断`);
+  }
+
+  await _sendCardBody({
+    msg_type: "interactive",
+    card: {
+      header: { title: { tag: "plain_text", content: title }, template: "blue" as const },
+      elements: [{ tag: "markdown", content }],
+    },
+  });
+}
+
+export async function sendCard(title: string, elements: unknown[]): Promise<void> {
+  await _sendCardBody({
+    msg_type: "interactive",
+    card: {
+      header: { title: { tag: "plain_text", content: title }, template: "blue" as const },
+      elements,
+    },
+  });
 }
 
 function signBody(body: Record<string, unknown>, secret: string): Record<string, unknown> {

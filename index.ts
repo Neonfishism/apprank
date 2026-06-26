@@ -8,7 +8,7 @@ import { fetchRobloxRankings } from "./fetcher-roblox.js";
 import { fetchSteamRankings } from "./fetcher-steam.js";
 import { saveSnapshot, loadSnapshot, buildMarketSnapshot, getDateBefore, getCleanupCutoff, cleanOldSnapshots } from "./snapshot.js";
 import { detectAnomalies, resolveAnomalies } from "./comparator.js";
-import { buildFeishuMessage, buildIosMessageChunks, sendFeishuMessage, MAX_MSG_LENGTH } from "./reporter.js";
+import { buildFeishuMessage, buildIosCollapsibleCards, sendFeishuMessage, sendCard } from "./reporter.js";
 import { MARKET_CODES, ROBLOX_MARKET, STEAM_MARKET, SILENT_MARKETS, COMPARISON_WINDOWS, SNAPSHOT_DIR } from "./config.js";
 import type { DailySnapshot, AppMeta } from "./types.js";
 import { existsSync } from "fs";
@@ -102,17 +102,16 @@ async function main(): Promise<void> {
       console.log(`  过滤静默市场: ${rawAnomalies.length - pushed.length} 条不推送`);
     }
 
-    // iOS：按地区边界拆分成多条消息，避免截断
+    // iOS：折叠卡片消息（每个国家一个折叠面板）
     const iosPushed = pushed.filter((a) => a.country !== STEAM_MARKET);
     if (iosPushed.length > 0) {
       const iosAnomalies = resolveAnomalies(iosPushed, metaMap);
-      const chunks = buildIosMessageChunks(iosAnomalies, date, MAX_MSG_LENGTH);
-      console.log(`\n── iOS 消息 (${iosPushed.length} 条, ${chunks.length} 条消息) ──`);
-      for (let i = 0; i < chunks.length; i++) {
-        console.log(`\n  [消息 ${i+1}/${chunks.length}, ${chunks[i].length} 字符]`);
-        console.log(chunks[i]);
-        const title = chunks.length > 1 ? `📱 iOS异动警告 (${i+1}/${chunks.length})` : "📱 iOS异动警告";
-        await sendFeishuMessage(chunks[i], title);
+      const cards = buildIosCollapsibleCards(iosAnomalies, date);
+      console.log(`\n── iOS 消息 (${iosPushed.length} 条, ${cards.length} 张卡片) ──`);
+      for (let i = 0; i < cards.length; i++) {
+        console.log(`\n  [卡片 ${i+1}/${cards.length}, ${cards[i].elements.length} 个元素]`);
+        console.log(JSON.stringify(cards[i], null, 2));
+        await sendCard(cards[i].title, cards[i].elements);
       }
     }
 
