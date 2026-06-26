@@ -186,6 +186,8 @@ export function buildIosCollapsibleCards(
 
       let maxChange = 0;
       let hasRocket = false;
+      let top3dGame = "";
+      let top3dChange = 0;
       for (const app of sorted) {
         const visible = app.changes.filter((c) => !HIDDEN_WINDOWS.has(c.days));
         for (const c of visible) {
@@ -194,10 +196,18 @@ export function buildIosCollapsibleCards(
           const oldRank = c.oldRank ?? app.currentRank;
           if ((oldRank <= 60 && ch > 50) || (oldRank > 60 && ch > 80)) hasRocket = true;
         }
+        // 记录 3 日窗口上升最多的游戏
+        const d3 = app.changes.find((c) => c.days === 3 && !HIDDEN_WINDOWS.has(c.days));
+        if (d3 && (d3.change ?? 0) > top3dChange) {
+          top3dChange = d3.change!;
+          top3dGame = app.appName;
+        }
       }
 
       const rocketIcon = hasRocket ? "🚀" : "⬆";
-      const title = `${rocketIcon} ${countryName} (${sorted.length}款) ▲最多${maxChange}`;
+      const title = top3dGame
+        ? `${rocketIcon} ${countryName} (${sorted.length}款) ${top3dGame} ⬆${top3dChange}`
+        : `${rocketIcon} ${countryName} (${sorted.length}款)`;
 
       const contentLines: string[] = [];
       for (const app of sorted) {
@@ -220,12 +230,58 @@ export function buildIosCollapsibleCards(
     }
 
     cards.push({
-      title: `📱 iOS 游戏异动警报${suffix} | ${date}`,
-      elements: panels,
+      title: `📱 iOS 游戏异动警报 | ${date}`,
+      elements: [
+        {
+          tag: "collapsible_panel",
+          expanded: false,
+          header: {
+            title: { tag: "plain_text", content: `📱 iOS 游戏榜${suffix} — ${slice.length} 个地区，共 ${cardGameCount} 款游戏` },
+            icon: { tag: "standard_icon", token: "down-small-ccm_outlined", size: "16px 16px" },
+            icon_position: "right" as const,
+            icon_expanded_angle: -180,
+          },
+          border: { color: "grey", corner_radius: "5px" },
+          elements: panels,
+        },
+      ],
     });
   }
 
   return cards;
+}
+
+/**
+ * 构建 Steam 折叠卡片消息。
+ */
+export function buildSteamFoldCard(anomalies: Anomaly[], date: string): { title: string; elements: unknown[] } | null {
+  if (anomalies.length === 0) return null;
+
+  const sorted = [...anomalies].sort((a, b) => a.currentRank - b.currentRank);
+  const contentLines: string[] = [`📊 **游戏异动警报** | ${date}\n\n🖥️ Steam 在线榜\n`];
+  for (const app of sorted) {
+    const line = buildAppLine(app);
+    if (line) contentLines.push(`    ${line}`);
+  }
+  contentLines.push(`---\n共 ${anomalies.length} 款游戏触发异动`);
+
+  return {
+    title: `🖥️ Steam 异动警报 | ${date}`,
+    elements: [
+      {
+        tag: "collapsible_panel",
+        expanded: false,
+        header: {
+          title: { tag: "plain_text", content: `🖥️ Steam 在线榜 — ${anomalies.length} 款游戏` },
+          icon: { tag: "standard_icon", token: "down-small-ccm_outlined", size: "16px 16px" },
+          icon_position: "right" as const,
+          icon_expanded_angle: -180,
+        },
+        border: { color: "grey", corner_radius: "5px" },
+        elements: [{ tag: "markdown", content: contentLines.join("\n") }],
+      },
+    ],
+  };
 }
 
 // ── 飞书发送 ──

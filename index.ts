@@ -8,7 +8,7 @@ import { fetchRobloxRankings } from "./fetcher-roblox.js";
 import { fetchSteamRankings } from "./fetcher-steam.js";
 import { saveSnapshot, loadSnapshot, buildMarketSnapshot, getDateBefore, getCleanupCutoff, cleanOldSnapshots } from "./snapshot.js";
 import { detectAnomalies, resolveAnomalies } from "./comparator.js";
-import { buildFeishuMessage, buildIosCollapsibleCards, sendFeishuMessage, sendCard } from "./reporter.js";
+import { buildFeishuMessage, buildIosCollapsibleCards, buildSteamFoldCard, sendFeishuMessage, sendCard } from "./reporter.js";
 import { MARKET_CODES, ROBLOX_MARKET, STEAM_MARKET, SILENT_MARKETS, COMPARISON_WINDOWS, SNAPSHOT_DIR } from "./config.js";
 import type { DailySnapshot, AppMeta } from "./types.js";
 import { existsSync } from "fs";
@@ -115,14 +115,16 @@ async function main(): Promise<void> {
       }
     }
 
-    // Steam：单独一条消息
+    // Steam：折叠卡片
     const stPushed = pushed.filter((a) => a.country === STEAM_MARKET);
     if (stPushed.length > 0) {
       const stAnomalies = resolveAnomalies(stPushed, metaMap);
-      const stMsg = buildFeishuMessage(stAnomalies, date);
-      console.log(`\n── Steam 消息 (${stPushed.length} 条) ──`);
-      console.log(stMsg);
-      await sendFeishuMessage(stMsg, "🖥️ Steam 异动警报");
+      const stCard = buildSteamFoldCard(stAnomalies, date);
+      if (stCard) {
+        console.log(`\n── Steam 消息 (${stPushed.length} 条) ──`);
+        console.log(JSON.stringify(stCard, null, 2));
+        await sendCard(stCard.title, stCard.elements);
+      }
     }
   } else {
     console.log("  无异动，静默退出");
