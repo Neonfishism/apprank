@@ -148,12 +148,9 @@ export function buildIosMessageChunks(anomalies: Anomaly[], date: string, maxLen
 
 // ── 折叠卡片构建 (新格式，iOS 用) ──
 
-const MAX_COUNTRIES_PER_CARD = 8;
-
 /**
- * 构建 iOS 折叠卡片消息。
- * 每个国家一个 collapsible_panel，标题显示摘要，点击展开查看游戏列表。
- * 返回多个卡片的 elements 配置数组（超过上限时自动分卡）。
+ * 构建 iOS 折叠卡片消息（单条）。
+ * 顶层一个折叠面板，内部每个国家一个次级折叠面板。
  */
 export function buildIosCollapsibleCards(
   anomalies: Anomaly[],
@@ -165,90 +162,77 @@ export function buildIosCollapsibleCards(
   const sortedCountries = [...byCountry.entries()]
     .sort((a, b) => b[1].length - a[1].length);
 
-  const totalCards = Math.ceil(sortedCountries.length / MAX_COUNTRIES_PER_CARD);
-  const cards: Array<{ title: string; elements: unknown[] }> = [];
+  const totalGames = anomalies.length;
+  const countryPanels: unknown[] = [];
 
-  for (let cardIdx = 0; cardIdx < totalCards; cardIdx++) {
-    const start = cardIdx * MAX_COUNTRIES_PER_CARD;
-    const slice = sortedCountries.slice(start, start + MAX_COUNTRIES_PER_CARD);
-    const cardGameCount = slice.reduce((sum, [, apps]) => sum + apps.length, 0);
+  // 卡片顶部的汇总行
+  countryPanels.push({
+    tag: "markdown",
+    content: `📊 **游戏异动警报** | ${date}\n\n📱 iOS 游戏榜 — ${sortedCountries.length} 个地区，共 ${totalGames} 款游戏`,
+  });
 
-    const panels: unknown[] = [];
-    const suffix = totalCards > 1 ? ` (${cardIdx + 1}/${totalCards})` : "";
-    panels.push({
-      tag: "markdown",
-      content: `📊 **游戏异动警报** | ${date}${suffix}\n\n📱 iOS 游戏榜 — ${slice.length} 个地区，共 ${cardGameCount} 款游戏`,
+  for (const [country, apps] of sortedCountries) {
+    const sorted = [...apps].sort((a, b) => a.currentRank - b.currentRank);
+    const countryName = sorted[0].countryName;
+
+    let hasRocket = false;
+    let top3dGame = "";
+    let top3dChange = 0;
+    for (const app of sorted) {
+      const visible = app.changes.filter((c) => !HIDDEN_WINDOWS.has(c.days));
+      for (const c of visible) {
+        const ch = c.change ?? 0;
+        const oldRank = c.oldRank ?? app.currentRank;
+        if ((oldRank <= 60 && ch > 50) || (oldRank > 60 && ch > 80)) hasRocket = true;
+      }
+      const d3 = app.changes.find((c) => c.days === 3 && !HIDDEN_WINDOWS.has(c.days));
+      if (d3 && (d3.change ?? 0) > top3dChange) {
+        top3dChange = d3.change!;
+        top3dGame = app.appName;
+      }
+    }
+
+    const rocketIcon = hasRocket ? "🚀" : "⬆";
+    const titleExtra = top3dGame ? ` ${top3dGame} ⬆${top3dChange}` : "";
+    const title = `<font color='blue'>${rocketIcon} **${countryName}**</font> (${sorted.length}款)${titleExtra}`;
+
+    const contentLines: string[] = [];
+    for (const app of sorted) {
+      const line = buildAppLine(app);
+      if (line) contentLines.push(`    ${line}`);
+    }
+
+    countryPanels.push({
+      tag: "collapsible_panel",
+      expanded: false,
+      header: {
+        title: { tag: "markdown", content: title },
+        icon: { tag: "standard_icon", token: "down-small-ccm_outlined", size: "16px 16px" },
+        icon_position: "right" as const,
+        icon_expanded_angle: -180,
+      },
+      border: { color: "grey", corner_radius: "5px" },
+      elements: [{ tag: "markdown", content: contentLines.join("\n") }],
     });
+  }
 
-    for (const [country, apps] of slice) {
-      const sorted = [...apps].sort((a, b) => a.currentRank - b.currentRank);
-      const countryName = sorted[0].countryName;
-
-      let maxChange = 0;
-      let hasRocket = false;
-      let top3dGame = "";
-      let top3dChange = 0;
-      for (const app of sorted) {
-        const visible = app.changes.filter((c) => !HIDDEN_WINDOWS.has(c.days));
-        for (const c of visible) {
-          const ch = c.change ?? 0;
-          if (ch > maxChange) maxChange = ch;
-          const oldRank = c.oldRank ?? app.currentRank;
-          if ((oldRank <= 60 && ch > 50) || (oldRank > 60 && ch > 80)) hasRocket = true;
-        }
-        // 记录 3 日窗口上升最多的游戏
-        const d3 = app.changes.find((c) => c.days === 3 && !HIDDEN_WINDOWS.has(c.days));
-        if (d3 && (d3.change ?? 0) > top3dChange) {
-          top3dChange = d3.change!;
-          top3dGame = app.appName;
-        }
-      }
-
-      const rocketIcon = hasRocket ? "🚀" : "⬆";
-      const title = top3dGame
-        ? `${rocketIcon} ${countryName} (${sorted.length}款) ${top3dGame} ⬆${top3dChange}`
-        : `${rocketIcon} ${countryName} (${sorted.length}款)`;
-
-      const contentLines: string[] = [];
-      for (const app of sorted) {
-        const line = buildAppLine(app);
-        if (line) contentLines.push(`    ${line}`);
-      }
-
-      panels.push({
+  return [{
+    title: `📱 iOS 游戏异动警报 | ${date}`,
+    elements: [
+      {
         tag: "collapsible_panel",
         expanded: false,
         header: {
-          title: { tag: "plain_text", content: title },
+          title: { tag: "plain_text", content: `📱 iOS 游戏榜 — ${sortedCountries.length} 个地区，共 ${totalGames} 款游戏` },
           icon: { tag: "standard_icon", token: "down-small-ccm_outlined", size: "16px 16px" },
           icon_position: "right" as const,
           icon_expanded_angle: -180,
         },
         border: { color: "grey", corner_radius: "5px" },
-        elements: [{ tag: "markdown", content: contentLines.join("\n") }],
-      });
-    }
-
-    cards.push({
-      title: `📱 iOS 游戏异动警报 | ${date}`,
-      elements: [
-        {
-          tag: "collapsible_panel",
-          expanded: false,
-          header: {
-            title: { tag: "plain_text", content: `📱 iOS 游戏榜${suffix} — ${slice.length} 个地区，共 ${cardGameCount} 款游戏` },
-            icon: { tag: "standard_icon", token: "down-small-ccm_outlined", size: "16px 16px" },
-            icon_position: "right" as const,
-            icon_expanded_angle: -180,
-          },
-          border: { color: "grey", corner_radius: "5px" },
-          elements: panels,
-        },
-      ],
-    });
-  }
-
-  return cards;
+        elements: countryPanels,
+      },
+    ],
+  }];
 }
 
 /**
