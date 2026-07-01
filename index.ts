@@ -105,25 +105,33 @@ async function main(): Promise<void> {
     // iOS：折叠卡片消息（每个国家一个折叠面板）
     const iosPushed = pushed.filter((a) => a.country !== STEAM_MARKET);
     if (iosPushed.length > 0) {
-      const iosAnomalies = resolveAnomalies(iosPushed, metaMap);
-      const cards = buildIosCollapsibleCards(iosAnomalies, date);
-      console.log(`\n── iOS 消息 (${iosPushed.length} 条, ${cards.length} 张卡片) ──`);
-      for (let i = 0; i < cards.length; i++) {
-        console.log(`\n  [卡片 ${i+1}/${cards.length}, ${cards[i].elements.length} 个元素]`);
-        console.log(JSON.stringify(cards[i], null, 2));
-        await sendCard(cards[i].title, cards[i].elements);
+      try {
+        const iosAnomalies = resolveAnomalies(iosPushed, metaMap);
+        const cards = buildIosCollapsibleCards(iosAnomalies, date);
+        console.log(`\n── iOS 消息 (${iosPushed.length} 条, ${cards.length} 张卡片) ──`);
+        for (let i = 0; i < cards.length; i++) {
+          console.log(`\n  [卡片 ${i+1}/${cards.length}, ${cards[i].elements.length} 个元素]`);
+          console.log(JSON.stringify(cards[i], null, 2));
+          await sendCard(cards[i].title, cards[i].elements);
+        }
+      } catch (err) {
+        console.error(`[reporter] iOS 飞书推送失败（快照已保存）: ${(err as Error).message}`);
       }
     }
 
     // Steam：折叠卡片
     const stPushed = pushed.filter((a) => a.country === STEAM_MARKET);
     if (stPushed.length > 0) {
-      const stAnomalies = resolveAnomalies(stPushed, metaMap);
-      const stCard = buildSteamFoldCard(stAnomalies, date);
-      if (stCard) {
-        console.log(`\n── Steam 消息 (${stPushed.length} 条) ──`);
-        console.log(JSON.stringify(stCard, null, 2));
-        await sendCard(stCard.title, stCard.elements);
+      try {
+        const stAnomalies = resolveAnomalies(stPushed, metaMap);
+        const stCard = buildSteamFoldCard(stAnomalies, date);
+        if (stCard) {
+          console.log(`\n── Steam 消息 (${stPushed.length} 条) ──`);
+          console.log(JSON.stringify(stCard, null, 2));
+          await sendCard(stCard.title, stCard.elements);
+        }
+      } catch (err) {
+        console.error(`[reporter] Steam 飞书推送失败（快照已保存）: ${(err as Error).message}`);
       }
     }
   } else {
