@@ -148,8 +148,43 @@ export function buildIosMessageChunks(anomalies: Anomaly[], date: string, maxLen
 
 // ── 折叠卡片构建 (新格式，iOS 用) ──
 
+/** 飞书卡片 30KB 限制，留 2KB 安全边距 */
+const MAX_CARD_BYTES = 28000;
+
+/** 估算一个 countryPanels 数组构建成卡片后的 JSON 大小 */
+function estimateCardSize(countryPanels: unknown[], totalGames: number, countryCount: number, date: string): number {
+  const card = buildOneCard(countryPanels, totalGames, countryCount, date);
+  return JSON.stringify(card).length;
+}
+
+/** 构建一张 iOS 折叠卡片 */
+function buildOneCard(
+  countryPanels: unknown[],
+  totalGames: number,
+  countryCount: number,
+  date: string,
+): { title: string; elements: unknown[] } {
+  return {
+    title: `📱 iOS 游戏异动警报 | ${date}`,
+    elements: [
+      {
+        tag: "collapsible_panel",
+        expanded: false,
+        header: {
+          title: { tag: "plain_text", content: `📱 iOS 游戏榜 — ${countryCount} 个地区，共 ${totalGames} 款游戏` },
+          icon: { tag: "standard_icon", token: "down-small-ccm_outlined", size: "16px 16px" },
+          icon_position: "right" as const,
+          icon_expanded_angle: -180,
+        },
+        border: { color: "grey", corner_radius: "5px" },
+        elements: countryPanels,
+      },
+    ],
+  };
+}
+
 /**
- * 构建 iOS 折叠卡片消息（单条）。
+ * 构建 iOS 折叠卡片消息（单条或多条，自动按 30KB 限制拆分）。
  * 顶层一个折叠面板，内部每个国家一个次级折叠面板。
  */
 export function buildIosCollapsibleCards(
@@ -163,14 +198,9 @@ export function buildIosCollapsibleCards(
     .sort((a, b) => b[1].length - a[1].length);
 
   const totalGames = anomalies.length;
-  const countryPanels: unknown[] = [];
 
-  // 卡片顶部的汇总行
-  countryPanels.push({
-    tag: "markdown",
-    content: `📊 **游戏异动警报** | ${date}\n\n📱 iOS 游戏榜 — ${sortedCountries.length} 个地区，共 ${totalGames} 款游戏`,
-  });
-
+  // 先构建所有国家面板及其游戏数
+  const countryEntries: Array<{ panel: unknown; gameCount: number }> = [];
   for (const [country, apps] of sortedCountries) {
     const sorted = [...apps].sort((a, b) => a.currentRank - b.currentRank);
     const countryName = sorted[0].countryName;
@@ -202,37 +232,96 @@ export function buildIosCollapsibleCards(
       if (line) contentLines.push(`    ${line}`);
     }
 
-    countryPanels.push({
-      tag: "collapsible_panel",
-      expanded: false,
-      header: {
-        title: { tag: "markdown", content: title },
-        icon: { tag: "standard_icon", token: "down-small-ccm_outlined", size: "16px 16px" },
-        icon_position: "right" as const,
-        icon_expanded_angle: -180,
-      },
-      border: { color: "grey", corner_radius: "5px" },
-      elements: [{ tag: "markdown", content: contentLines.join("\n") }],
-    });
-  }
-
-  return [{
-    title: `📱 iOS 游戏异动警报 | ${date}`,
-    elements: [
-      {
+    countryEntries.push({
+      gameCount: sorted.length,
+      panel: {
         tag: "collapsible_panel",
         expanded: false,
         header: {
-          title: { tag: "plain_text", content: `📱 iOS 游戏榜 — ${sortedCountries.length} 个地区，共 ${totalGames} 款游戏` },
+          title: { tag: "markdown", content: title },
           icon: { tag: "standard_icon", token: "down-small-ccm_outlined", size: "16px 16px" },
           icon_position: "right" as const,
           icon_expanded_angle: -180,
         },
         border: { color: "grey", corner_radius: "5px" },
-        elements: countryPanels,
+        elements: [{ tag: "markdown", content: contentLines.join("\n") }],
       },
-    ],
-  }];
+    });
+  }
+
+  const allCountryPanels = countryEntries.map((e) => e.panel);
+
+  // 先尝试单卡片
+  const singleCardCountryPanels = [
+    {
+      tag: "markdown" as const,
+      content: `📊 **游戏异动警报** | ${date}\n\n📱 iOS 游戏榜 — ${sortedCountries.length} 个地区，共 ${totalGames} 款游戏`,
+    },
+    ...allCountryPanels,
+  ];
+
+  if (estimateCardSize(singleCardCountryPanels, totalGames, sortedCountries.length, date) <= MAX_CARD_BYTES) {
+    return [buildOneCard(singleCardCountryPanels, totalGames, sortedCountries.length, date)];
+  }
+
+  // 超过限制，按国家拆分
+  console.log(`[reporter] iOS 卡片超过 ${MAX_CARD_BYTES} 字节，开始拆分...`);
+  const cards: Array<{ title: string; elements: unknown[] }> = [];
+  let chunk: unknown[] = [];
+  let chunkGames = 0;
+  let chunkCountries = 0;
+
+  function flushChunk(): void {
+    if (chunk.length === 0) return;
+    const cardCountryPanels = [
+      {
+        tag: "markdown" as const,
+        content: `📊 **游戏异动警报** | ${date}\n\n📱 iOS 游戏榜 — ${chunkCountries} 个地区，共 ${chunkGames} 款游戏`,
+      },
+      ...chunk,
+    ];
+    cards.push(buildOneCard(cardCountryPanels, chunkGames, chunkCountries, date));
+    chunk = [];
+    chunkGames = 0;
+    chunkCountries = 0;
+  }
+
+  for (const { panel, gameCount } of countryEntries) {
+    const testChunk = [
+      {
+        tag: "markdown" as const,
+        content: `📊 **游戏异动警报** | ${date}\n\n📱 iOS 游戏榜 — 共 ${totalGames} 款游戏`,
+      },
+      ...chunk,
+      panel,
+    ];
+
+    if (chunk.length > 0 &&
+        estimateCardSize(testChunk, totalGames, chunkCountries + 1, date) > MAX_CARD_BYTES) {
+      flushChunk();
+    }
+    chunk.push(panel);
+    chunkGames += gameCount;
+    chunkCountries++;
+  }
+  flushChunk();
+
+  // 多卡片时添加编号后缀
+  if (cards.length > 1) {
+    for (let i = 0; i < cards.length; i++) {
+      cards[i].title += ` (${i + 1}/${cards.length})`;
+      // 更新折叠面板标题
+      const cp = cards[i].elements[0] as Record<string, unknown>;
+      if (cp?.header && typeof cp.header === "object") {
+        const hdr = cp.header as Record<string, unknown>;
+        if (hdr.title && typeof hdr.title === "object") {
+          (hdr.title as Record<string, string>).content += ` (${i + 1}/${cards.length})`;
+        }
+      }
+    }
+  }
+
+  return cards;
 }
 
 /**
