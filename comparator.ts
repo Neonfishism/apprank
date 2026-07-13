@@ -3,7 +3,7 @@
  */
 
 import type { DailySnapshot, AppMeta, RankChange, Anomaly } from "./types.js";
-import { getThreshold, COMPARISON_WINDOWS, MARKETS, ROBLOX_MARKET, STEAM_MARKET, TOP_N } from "./config.js";
+import { getThreshold, COMPARISON_WINDOWS, MARKETS, ROBLOX_MARKET, STEAM_MARKET, TOP_N, HIDDEN_WINDOWS } from "./config.js";
 
 export interface RawAnomaly {
   country: string;
@@ -71,7 +71,7 @@ export function detectAnomalies(
     for (let i = 0; i < market.apps.length; i++) {
       const appId = market.apps[i].app_id;
       const changes = computeChanges(appId, i + 1, historySnapshots, country);
-      if (changes.some((c) => c.triggered)) {
+      if (changes.some((c) => c.triggered && !HIDDEN_WINDOWS.has(c.days))) {
         anomalies.push({ country, appId, currentRank: i + 1, changes });
       }
     }
