@@ -135,14 +135,14 @@ async function main(): Promise<void> {
 
     // Steam 合并卡片（在线榜 + 愿望单榜）
     const stPushed = pushed.filter((a) => a.country === STEAM_MARKET);
-    const wlPushed = pushed.filter((a) => a.country === WISHLIST_MARKET);
-    if (stPushed.length > 0 || wlPushed.length > 0) {
+    // 愿望单暂不推送，仅积累快照
+    const wlAnomalies = resolveAnomalies([], metaMap);
+    if (stPushed.length > 0) {
       try {
         const stAnomalies = resolveAnomalies(stPushed, metaMap);
-        const wlAnomalies = resolveAnomalies(wlPushed, metaMap);
         const card = buildSteamCard(stAnomalies, wlAnomalies, date);
         if (card) {
-          console.log(`\n── Steam 合并消息 (在线: ${stPushed.length} 条, 愿望单: ${wlPushed.length} 条) ──`);
+          console.log(`\n── Steam 消息 (${stPushed.length} 条) ──`);
           console.log(JSON.stringify(card, null, 2));
           await sendCard(card.title, card.elements);
         }
