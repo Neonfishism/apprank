@@ -15,6 +15,9 @@ export const ROBLOX_MARKET = "RB";
 /** Steam 作为特殊市场 */
 export const STEAM_MARKET = "ST";
 
+/** 愿望单作为特殊市场 */
+export const WISHLIST_MARKET = "WL";
+
 export const MARKET_CODES = Object.keys(MARKETS);
 
 export interface RankThreshold { min: number; max: number; threshold: number; }
@@ -23,6 +26,13 @@ export const THRESHOLDS: RankThreshold[] = [
   { min: 11, max: 30, threshold: 15 },
   { min: 31, max: 60, threshold: 25 },
   { min: 61, max: 100, threshold: 35 },
+];
+
+/** 愿望单专属阈值（变化更灵敏） */
+export const WISHLIST_THRESHOLDS: RankThreshold[] = [
+  { min: 1, max: 30, threshold: 10 },
+  { min: 31, max: 60, threshold: 20 },
+  { min: 61, max: 100, threshold: 30 },
 ];
 
 export const COMPARISON_WINDOWS: { days: number; label: string }[] = [
@@ -43,7 +53,8 @@ export const SNAPSHOT_DIR = "snapshots";
 /** 不推送的市场（数据仍采集）。RB = Roblox */
 export const SILENT_MARKETS = new Set(["ID", "HK", "PH", "RB"]);
 
-export function getThreshold(rank: number): number {
-  for (const t of THRESHOLDS) if (rank >= t.min && rank <= t.max) return t.threshold;
+export function getThreshold(rank: number, market?: string): number {
+  const thresholds = market === WISHLIST_MARKET ? WISHLIST_THRESHOLDS : THRESHOLDS;
+  for (const t of thresholds) if (rank >= t.min && rank <= t.max) return t.threshold;
   return Infinity;
 }

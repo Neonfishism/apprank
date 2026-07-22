@@ -3,7 +3,7 @@
  */
 
 import type { Anomaly } from "./types.js";
-import { MAX_RETRIES, ROBLOX_MARKET, STEAM_MARKET, HIDDEN_WINDOWS } from "./config.js";
+import { MAX_RETRIES, ROBLOX_MARKET, STEAM_MARKET, WISHLIST_MARKET, HIDDEN_WINDOWS } from "./config.js";
 import { createHmac } from "crypto";
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -346,6 +346,39 @@ export function buildSteamFoldCard(anomalies: Anomaly[], date: string): { title:
         expanded: false,
         header: {
           title: { tag: "plain_text", content: `🖥️ Steam 在线榜 — ${anomalies.length} 款游戏` },
+          icon: { tag: "standard_icon", token: "down-small-ccm_outlined", size: "16px 16px" },
+          icon_position: "right" as const,
+          icon_expanded_angle: -180,
+        },
+        border: { color: "grey", corner_radius: "5px" },
+        elements: [{ tag: "markdown", content: contentLines.join("\n") }],
+      },
+    ],
+  };
+}
+
+/**
+ * 构建愿望单折叠卡片消息。
+ */
+export function buildWishlistFoldCard(anomalies: Anomaly[], date: string): { title: string; elements: unknown[] } | null {
+  if (anomalies.length === 0) return null;
+
+  const sorted = [...anomalies].sort((a, b) => a.currentRank - b.currentRank);
+  const contentLines: string[] = [`📊 **游戏异动警报** | ${date}\n\n📝 Steam 愿望单\n`];
+  for (const app of sorted) {
+    const line = buildAppLine(app);
+    if (line) contentLines.push(`    ${line}`);
+  }
+  contentLines.push(`---\n共 ${anomalies.length} 款游戏触发异动`);
+
+  return {
+    title: `📝 愿望单异动警报 | ${date}`,
+    elements: [
+      {
+        tag: "collapsible_panel",
+        expanded: false,
+        header: {
+          title: { tag: "plain_text", content: `📝 Steam 愿望单 — ${anomalies.length} 款游戏` },
           icon: { tag: "standard_icon", token: "down-small-ccm_outlined", size: "16px 16px" },
           icon_position: "right" as const,
           icon_expanded_angle: -180,

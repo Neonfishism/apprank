@@ -1,15 +1,16 @@
 /**
  * App 排名异动监控 — 主入口
- * 平台：iOS（16 国游戏下载榜）+ Roblox（在线人数榜）+ Steam（在线人数榜）
+ * 平台：iOS（16 国游戏下载榜）+ Roblox（在线人数榜）+ Steam（在线人数榜）+ 愿望单
  */
 
 import { fetchMarketRankings } from "./fetcher.js";
 import { fetchRobloxRankings } from "./fetcher-roblox.js";
 import { fetchSteamRankings } from "./fetcher-steam.js";
+import { fetchWishlistRankings } from "./fetcher-wishlist.js";
 import { saveSnapshot, loadSnapshot, buildMarketSnapshot, getDateBefore, getCleanupCutoff, cleanOldSnapshots } from "./snapshot.js";
 import { detectAnomalies, resolveAnomalies } from "./comparator.js";
-import { buildFeishuMessage, buildIosCollapsibleCards, buildSteamFoldCard, sendFeishuMessage, sendCard } from "./reporter.js";
-import { MARKET_CODES, ROBLOX_MARKET, STEAM_MARKET, SILENT_MARKETS, COMPARISON_WINDOWS, SNAPSHOT_DIR } from "./config.js";
+import { buildFeishuMessage, buildIosCollapsibleCards, buildSteamFoldCard, buildWishlistFoldCard, sendFeishuMessage, sendCard } from "./reporter.js";
+import { MARKET_CODES, ROBLOX_MARKET, STEAM_MARKET, WISHLIST_MARKET, SILENT_MARKETS, COMPARISON_WINDOWS, SNAPSHOT_DIR } from "./config.js";
 import type { DailySnapshot, AppMeta } from "./types.js";
 import { existsSync } from "fs";
 import { join } from "path";
@@ -72,6 +73,19 @@ async function main(): Promise<void> {
     console.error(`  ✗ Steam: ${(err as Error).message}`);
   }
 
+  // ── 愿望单 ──
+  console.log("[愿望单] 拉取 Steam 愿望单 Top 100...");
+  try {
+    const apps = await fetchWishlistRankings();
+    markets[WISHLIST_MARKET] = buildMarketSnapshot(apps.map((a) => a.app_id));
+    for (const a of apps) metaMap.set(a.app_id, a);
+    ok++;
+    console.log(`  ✓ 愿望单: ${apps.length} 款`);
+  } catch (err) {
+    fail++;
+    console.error(`  ✗ 愿望单: ${(err as Error).message}`);
+  }
+
   console.log(`\n榜单拉取完成: ${ok} 成功, ${fail} 失败`);
   if (ok === 0) { console.error("全部失败，终止"); return; }
 
@@ -103,7 +117,7 @@ async function main(): Promise<void> {
     }
 
     // iOS：折叠卡片消息（每个国家一个折叠面板）
-    const iosPushed = pushed.filter((a) => a.country !== STEAM_MARKET);
+    const iosPushed = pushed.filter((a) => a.country !== STEAM_MARKET && a.country !== WISHLIST_MARKET);
     if (iosPushed.length > 0) {
       try {
         const iosAnomalies = resolveAnomalies(iosPushed, metaMap);
@@ -132,6 +146,22 @@ async function main(): Promise<void> {
         }
       } catch (err) {
         console.error(`[reporter] Steam 飞书推送失败（快照已保存）: ${(err as Error).message}`);
+      }
+    }
+
+    // 愿望单：折叠卡片
+    const wlPushed = pushed.filter((a) => a.country === WISHLIST_MARKET);
+    if (wlPushed.length > 0) {
+      try {
+        const wlAnomalies = resolveAnomalies(wlPushed, metaMap);
+        const wlCard = buildWishlistFoldCard(wlAnomalies, date);
+        if (wlCard) {
+          console.log(`\n── 愿望单消息 (${wlPushed.length} 条) ──`);
+          console.log(JSON.stringify(wlCard, null, 2));
+          await sendCard(wlCard.title, wlCard.elements);
+        }
+      } catch (err) {
+        console.error(`[reporter] 愿望单飞书推送失败（快照已保存）: ${(err as Error).message}`);
       }
     }
   } else {

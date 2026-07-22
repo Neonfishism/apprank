@@ -34,10 +34,10 @@ function computeChanges(
     if (oldRank === null) {
       // 新上榜：视为从榜外（TOP_N 之后）进入
       const change = TOP_N + 1 - currentRank;
-      return { windowLabel: label, days, oldRank: null, change, triggered: change >= getThreshold(currentRank) };
+      return { windowLabel: label, days, oldRank: null, change, triggered: change >= getThreshold(currentRank, country) };
     }
     const change = oldRank - currentRank;
-    return { windowLabel: label, days, oldRank, change, triggered: change > 0 && change >= getThreshold(currentRank) };
+    return { windowLabel: label, days, oldRank, change, triggered: change > 0 && change >= getThreshold(currentRank, country) };
   });
 }
 
