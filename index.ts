@@ -9,7 +9,7 @@ import { fetchSteamRankings } from "./fetcher-steam.js";
 import { fetchWishlistRankings } from "./fetcher-wishlist.js";
 import { saveSnapshot, loadSnapshot, buildMarketSnapshot, getDateBefore, getCleanupCutoff, cleanOldSnapshots } from "./snapshot.js";
 import { detectAnomalies, resolveAnomalies } from "./comparator.js";
-import { buildFeishuMessage, buildIosCollapsibleCards, buildSteamFoldCard, buildWishlistFoldCard, sendFeishuMessage, sendCard } from "./reporter.js";
+import { buildFeishuMessage, buildIosCollapsibleCards, buildSteamCard, sendFeishuMessage, sendCard } from "./reporter.js";
 import { MARKET_CODES, ROBLOX_MARKET, STEAM_MARKET, WISHLIST_MARKET, SILENT_MARKETS, COMPARISON_WINDOWS, SNAPSHOT_DIR } from "./config.js";
 import type { DailySnapshot, AppMeta } from "./types.js";
 import { existsSync } from "fs";
@@ -133,35 +133,21 @@ async function main(): Promise<void> {
       }
     }
 
-    // Steam：折叠卡片
+    // Steam 合并卡片（在线榜 + 愿望单榜）
     const stPushed = pushed.filter((a) => a.country === STEAM_MARKET);
-    if (stPushed.length > 0) {
+    const wlPushed = pushed.filter((a) => a.country === WISHLIST_MARKET);
+    if (stPushed.length > 0 || wlPushed.length > 0) {
       try {
         const stAnomalies = resolveAnomalies(stPushed, metaMap);
-        const stCard = buildSteamFoldCard(stAnomalies, date);
-        if (stCard) {
-          console.log(`\n── Steam 消息 (${stPushed.length} 条) ──`);
-          console.log(JSON.stringify(stCard, null, 2));
-          await sendCard(stCard.title, stCard.elements);
+        const wlAnomalies = resolveAnomalies(wlPushed, metaMap);
+        const card = buildSteamCard(stAnomalies, wlAnomalies, date);
+        if (card) {
+          console.log(`\n── Steam 合并消息 (在线: ${stPushed.length} 条, 愿望单: ${wlPushed.length} 条) ──`);
+          console.log(JSON.stringify(card, null, 2));
+          await sendCard(card.title, card.elements);
         }
       } catch (err) {
         console.error(`[reporter] Steam 飞书推送失败（快照已保存）: ${(err as Error).message}`);
-      }
-    }
-
-    // 愿望单：折叠卡片
-    const wlPushed = pushed.filter((a) => a.country === WISHLIST_MARKET);
-    if (wlPushed.length > 0) {
-      try {
-        const wlAnomalies = resolveAnomalies(wlPushed, metaMap);
-        const wlCard = buildWishlistFoldCard(wlAnomalies, date);
-        if (wlCard) {
-          console.log(`\n── 愿望单消息 (${wlPushed.length} 条) ──`);
-          console.log(JSON.stringify(wlCard, null, 2));
-          await sendCard(wlCard.title, wlCard.elements);
-        }
-      } catch (err) {
-        console.error(`[reporter] 愿望单飞书推送失败（快照已保存）: ${(err as Error).message}`);
       }
     }
   } else {

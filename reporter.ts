@@ -325,68 +325,66 @@ export function buildIosCollapsibleCards(
 }
 
 /**
- * 构建 Steam 折叠卡片消息。
+ * 构建 Steam 合并卡片消息（在线榜 + 愿望单榜两个折叠面板）。
  */
-export function buildSteamFoldCard(anomalies: Anomaly[], date: string): { title: string; elements: unknown[] } | null {
-  if (anomalies.length === 0) return null;
+export function buildSteamCard(
+  onlineAnomalies: Anomaly[],
+  wishlistAnomalies: Anomaly[],
+  date: string
+): { title: string; elements: unknown[] } | null {
+  const panels: unknown[] = [];
 
-  const sorted = [...anomalies].sort((a, b) => a.currentRank - b.currentRank);
-  const contentLines: string[] = [`📊 **游戏异动警报** | ${date}\n\n🖥️ Steam 在线榜\n`];
-  for (const app of sorted) {
-    const line = buildAppLine(app);
-    if (line) contentLines.push(`    ${line}`);
+  // 在线榜
+  if (onlineAnomalies.length > 0) {
+    const sorted = [...onlineAnomalies].sort((a, b) => a.currentRank - b.currentRank);
+    const lines: string[] = [`📊 **游戏异动警报** | ${date}\n\n🖥️ Steam 在线榜\n`];
+    for (const app of sorted) {
+      const line = buildAppLine(app);
+      if (line) lines.push(`    ${line}`);
+    }
+    lines.push(`---\n共 ${onlineAnomalies.length} 款游戏触发异动`);
+    panels.push({
+      tag: "collapsible_panel",
+      expanded: true,
+      header: {
+        title: { tag: "plain_text", content: `🖥️ Steam 在线榜 — ${onlineAnomalies.length} 款` },
+        icon: { tag: "standard_icon", token: "down-small-ccm_outlined", size: "16px 16px" },
+        icon_position: "right" as const,
+        icon_expanded_angle: -180,
+      },
+      border: { color: "grey", corner_radius: "5px" },
+      elements: [{ tag: "markdown", content: lines.join("\n") }],
+    });
   }
-  contentLines.push(`---\n共 ${anomalies.length} 款游戏触发异动`);
+
+  // 愿望单榜
+  if (wishlistAnomalies.length > 0) {
+    const sorted = [...wishlistAnomalies].sort((a, b) => a.currentRank - b.currentRank);
+    const lines: string[] = [`📝 Steam 愿望单\n`];
+    for (const app of sorted) {
+      const line = buildAppLine(app);
+      if (line) lines.push(`    ${line}`);
+    }
+    lines.push(`---\n共 ${wishlistAnomalies.length} 款游戏触发异动`);
+    panels.push({
+      tag: "collapsible_panel",
+      expanded: true,
+      header: {
+        title: { tag: "plain_text", content: `📝 Steam 愿望单 — ${wishlistAnomalies.length} 款` },
+        icon: { tag: "standard_icon", token: "down-small-ccm_outlined", size: "16px 16px" },
+        icon_position: "right" as const,
+        icon_expanded_angle: -180,
+      },
+      border: { color: "grey", corner_radius: "5px" },
+      elements: [{ tag: "markdown", content: lines.join("\n") }],
+    });
+  }
+
+  if (panels.length === 0) return null;
 
   return {
     title: `🖥️ Steam 异动警报 | ${date}`,
-    elements: [
-      {
-        tag: "collapsible_panel",
-        expanded: false,
-        header: {
-          title: { tag: "plain_text", content: `🖥️ Steam 在线榜 — ${anomalies.length} 款游戏` },
-          icon: { tag: "standard_icon", token: "down-small-ccm_outlined", size: "16px 16px" },
-          icon_position: "right" as const,
-          icon_expanded_angle: -180,
-        },
-        border: { color: "grey", corner_radius: "5px" },
-        elements: [{ tag: "markdown", content: contentLines.join("\n") }],
-      },
-    ],
-  };
-}
-
-/**
- * 构建愿望单折叠卡片消息。
- */
-export function buildWishlistFoldCard(anomalies: Anomaly[], date: string): { title: string; elements: unknown[] } | null {
-  if (anomalies.length === 0) return null;
-
-  const sorted = [...anomalies].sort((a, b) => a.currentRank - b.currentRank);
-  const contentLines: string[] = [`📊 **游戏异动警报** | ${date}\n\n📝 Steam 愿望单\n`];
-  for (const app of sorted) {
-    const line = buildAppLine(app);
-    if (line) contentLines.push(`    ${line}`);
-  }
-  contentLines.push(`---\n共 ${anomalies.length} 款游戏触发异动`);
-
-  return {
-    title: `📝 愿望单异动警报 | ${date}`,
-    elements: [
-      {
-        tag: "collapsible_panel",
-        expanded: false,
-        header: {
-          title: { tag: "plain_text", content: `📝 Steam 愿望单 — ${anomalies.length} 款游戏` },
-          icon: { tag: "standard_icon", token: "down-small-ccm_outlined", size: "16px 16px" },
-          icon_position: "right" as const,
-          icon_expanded_angle: -180,
-        },
-        border: { color: "grey", corner_radius: "5px" },
-        elements: [{ tag: "markdown", content: contentLines.join("\n") }],
-      },
-    ],
+    elements: panels,
   };
 }
 
