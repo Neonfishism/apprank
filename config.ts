@@ -35,6 +35,25 @@ export const WISHLIST_THRESHOLDS: RankThreshold[] = [
   { min: 61, max: 100, threshold: 30 },
 ];
 
+/** 竞品榜单：免费榜市场 key 前缀（Top Free） */
+export const COMPETITOR_FREE_PREFIX = "TF:";
+
+/** 竞品榜单：畅销榜市场 key 前缀（Top Grossing） */
+export const COMPETITOR_GROSS_PREFIX = "TG:";
+
+/** 竞品榜单阈值（免费榜与畅销榜共用） */
+export const COMPETITOR_THRESHOLDS: RankThreshold[] = [
+  { min: 1, max: 10, threshold: 4 },
+  { min: 11, max: 30, threshold: 10 },
+  { min: 31, max: 60, threshold: 15 },
+  { min: 61, max: 100, threshold: 25 },
+];
+
+/** 判断是否为竞品榜单市场（TF:XX / TG:XX） */
+export function isCompetitorMarket(market?: string): boolean {
+  return !!market && (market.startsWith(COMPETITOR_FREE_PREFIX) || market.startsWith(COMPETITOR_GROSS_PREFIX));
+}
+
 export const COMPARISON_WINDOWS: { days: number; label: string }[] = [
   { days: 3, label: "3日前" },
   { days: 7, label: "7日前" },
@@ -54,7 +73,9 @@ export const SNAPSHOT_DIR = "snapshots";
 export const SILENT_MARKETS = new Set(["ID", "HK", "PH", "RB"]);
 
 export function getThreshold(rank: number, market?: string): number {
-  const thresholds = market === WISHLIST_MARKET ? WISHLIST_THRESHOLDS : THRESHOLDS;
+  let thresholds = THRESHOLDS;
+  if (market === WISHLIST_MARKET) thresholds = WISHLIST_THRESHOLDS;
+  else if (isCompetitorMarket(market)) thresholds = COMPETITOR_THRESHOLDS;
   for (const t of thresholds) if (rank >= t.min && rank <= t.max) return t.threshold;
   return Infinity;
 }

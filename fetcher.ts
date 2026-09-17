@@ -9,7 +9,7 @@ import { TOP_N, MAX_RETRIES } from "./config.js";
 
 const ITUNES_RSS = "https://itunes.apple.com";
 
-const COUNTRY_MAP: Record<string, string> = {
+export const COUNTRY_MAP: Record<string, string> = {
   CN: "cn", TW: "tw", JP: "jp", KR: "kr",
   SA: "sa", TR: "tr", RU: "ru", DE: "de",
   FR: "fr", IT: "it", US: "us",
@@ -17,18 +17,18 @@ const COUNTRY_MAP: Record<string, string> = {
 };
 
 /** iTunes RSS 返回的条目 */
-interface ITunesEntry {
+export interface ITunesEntry {
   "im:name": { label: string };
   "im:artist": { label: string };
   id: { label: string; attributes: { "im:id": string } };
   link?: { attributes?: { href?: string } } | Array<{ attributes?: { href?: string } }>;
 }
 
-interface ITunesResponse {
+export interface ITunesResponse {
   feed: { entry: ITunesEntry[] };
 }
 
-async function fetchWithRetry(url: string, retries = MAX_RETRIES): Promise<string> {
+export async function fetchWithRetry(url: string, retries = MAX_RETRIES): Promise<string> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const res = await fetch(url);
@@ -43,7 +43,7 @@ async function fetchWithRetry(url: string, retries = MAX_RETRIES): Promise<strin
 }
 
 /** 生成七麦数据链接（网页版 App Store，不受地区限制） */
-function qimaiUrl(appId: number, cc: string): string {
+export function qimaiUrl(appId: number, cc: string): string {
   return `https://www.qimai.cn/app/rank/appid/${appId}/country/${cc}`;
 }
 
