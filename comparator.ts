@@ -3,7 +3,7 @@
  */
 
 import type { DailySnapshot, AppMeta, RankChange, Anomaly } from "./types.js";
-import { getThreshold, COMPARISON_WINDOWS, MARKETS, ROBLOX_MARKET, STEAM_MARKET, TOP_N, HIDDEN_WINDOWS } from "./config.js";
+import { getThreshold, COMPARISON_WINDOWS, MARKETS, ROBLOX_MARKET, STEAM_MARKET, TOP_N, HIDDEN_WINDOWS, isCompetitorMarket } from "./config.js";
 
 export interface RawAnomaly {
   country: string;
@@ -84,9 +84,11 @@ export function resolveAnomalies(rawAnomalies: RawAnomaly[], metaMap: Map<number
     const meta = metaMap.get(raw.appId);
     const isRB = raw.country === ROBLOX_MARKET;
     const isST = raw.country === STEAM_MARKET;
+    // 竞品市场 key 形如 TF:US / TG:US，展示与链接需要还原基础国家码
+    const baseCountry = isCompetitorMarket(raw.country) ? raw.country.slice(3) : raw.country;
     return {
       country: raw.country,
-      countryName: isRB ? "Roblox" : isST ? "Steam" : (MARKETS[raw.country] || raw.country),
+      countryName: isRB ? "Roblox" : isST ? "Steam" : (MARKETS[baseCountry] || baseCountry),
       appId: raw.appId,
       appName: meta?.name || `App ${raw.appId}`,
       publisherName: meta?.publisher || "未知",
@@ -95,7 +97,7 @@ export function resolveAnomalies(rawAnomalies: RawAnomaly[], metaMap: Map<number
       // iOS 根据异常国家重新生成七麦链接，避免 metaMap 覆盖导致的串区问题
       appStoreUrl: isRB || isST
         ? (meta?.url || "")
-        : `https://www.qimai.cn/app/rank/appid/${raw.appId}/country/${raw.country.toLowerCase()}`,
+        : `https://www.qimai.cn/app/rank/appid/${raw.appId}/country/${baseCountry.toLowerCase()}`,
       changes: raw.changes,
       emoji: "⬆",
     };

@@ -3,7 +3,7 @@
  */
 
 import type { Anomaly } from "./types.js";
-import { MAX_RETRIES, ROBLOX_MARKET, STEAM_MARKET, WISHLIST_MARKET, HIDDEN_WINDOWS } from "./config.js";
+import { MAX_RETRIES, ROBLOX_MARKET, STEAM_MARKET, WISHLIST_MARKET, HIDDEN_WINDOWS, MARKETS, COMPETITOR_FREE_PREFIX } from "./config.js";
 import { createHmac } from "crypto";
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -385,6 +385,56 @@ export function buildSteamCard(
   return {
     title: `🖥️ Steam 异动警报 | ${date}`,
     elements: panels,
+  };
+}
+
+// ── 竞品榜单卡片 (免费榜 + 畅销榜，按地区分组) ──
+
+/**
+ * 构建竞品榜单异动卡片：按地区分组，地区内分免费榜 / 畅销榜两节。
+ * 输入须已按白名单过滤（见 competitors.ts）。
+ */
+export function buildCompetitorCard(
+  anomalies: Anomaly[],
+  date: string
+): { title: string; elements: unknown[] } | null {
+  if (anomalies.length === 0) return null;
+
+  // 市场 key 形如 TF:US / TG:US，按基础国家分组
+  const byCountry = new Map<string, { free: Anomaly[]; gross: Anomaly[] }>();
+  for (const a of anomalies) {
+    const cc = a.country.slice(3);
+    if (!byCountry.has(cc)) byCountry.set(cc, { free: [], gross: [] });
+    const bucket = byCountry.get(cc)!;
+    if (a.country.startsWith(COMPETITOR_FREE_PREFIX)) bucket.free.push(a);
+    else bucket.gross.push(a);
+  }
+
+  // 按 MARKETS 定义顺序展示地区，保持每天消息结构稳定
+  const marketOrder = Object.keys(MARKETS);
+  const countries = [...byCountry.keys()].sort(
+    (a, b) => (marketOrder.indexOf(a) + 1 || 999) - (marketOrder.indexOf(b) + 1 || 999)
+  );
+
+  const lines: string[] = [];
+  for (const cc of countries) {
+    const { free, gross } = byCountry.get(cc)!;
+    lines.push(`<font color='blue'>**${MARKETS[cc] || cc}**</font>`);
+    if (free.length > 0) {
+      lines.push("  🆓 免费榜");
+      for (const app of [...free].sort((a, b) => a.currentRank - b.currentRank)) appendApp(lines, app);
+    }
+    if (gross.length > 0) {
+      lines.push("  💰 畅销榜");
+      for (const app of [...gross].sort((a, b) => a.currentRank - b.currentRank)) appendApp(lines, app);
+    }
+    lines.push("---");
+  }
+  lines.push(`共 ${anomalies.length} 款产品触发异动`);
+
+  return {
+    title: `🏆 竞品榜单异动警报 | ${date}`,
+    elements: [{ tag: "markdown", content: lines.join("\n") }],
   };
 }
 

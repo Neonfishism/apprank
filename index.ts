@@ -7,10 +7,12 @@ import { fetchMarketRankings } from "./fetcher.js";
 import { fetchRobloxRankings } from "./fetcher-roblox.js";
 import { fetchSteamRankings } from "./fetcher-steam.js";
 import { fetchWishlistRankings } from "./fetcher-wishlist.js";
+import { fetchCompetitorChart } from "./fetcher-competitors.js";
+import { COMPETITOR_APPS } from "./competitors.js";
 import { saveSnapshot, loadSnapshot, buildMarketSnapshot, getDateBefore, getCleanupCutoff, cleanOldSnapshots } from "./snapshot.js";
 import { detectAnomalies, resolveAnomalies } from "./comparator.js";
-import { buildFeishuMessage, buildIosCollapsibleCards, buildSteamCard, sendFeishuMessage, sendCard } from "./reporter.js";
-import { MARKET_CODES, ROBLOX_MARKET, STEAM_MARKET, WISHLIST_MARKET, SILENT_MARKETS, COMPARISON_WINDOWS, SNAPSHOT_DIR } from "./config.js";
+import { buildFeishuMessage, buildIosCollapsibleCards, buildSteamCard, buildCompetitorCard, sendFeishuMessage, sendCard } from "./reporter.js";
+import { MARKET_CODES, ROBLOX_MARKET, STEAM_MARKET, WISHLIST_MARKET, SILENT_MARKETS, COMPARISON_WINDOWS, SNAPSHOT_DIR, COMPETITOR_FREE_PREFIX, COMPETITOR_GROSS_PREFIX, isCompetitorMarket } from "./config.js";
 import type { DailySnapshot, AppMeta } from "./types.js";
 import { existsSync } from "fs";
 import { join } from "path";
@@ -86,6 +88,25 @@ async function main(): Promise<void> {
     console.error(`  ✗ 愿望单: ${(err as Error).message}`);
   }
 
+  // ── 竞品榜单（免费榜 + 畅销榜总榜）──
+  console.log("[竞品] 拉取 16 国免费榜/畅销榜...");
+  for (const country of MARKET_CODES) {
+    try {
+      const [free, gross] = await Promise.all([
+        fetchCompetitorChart(country, "free"),
+        fetchCompetitorChart(country, "gross"),
+      ]);
+      markets[COMPETITOR_FREE_PREFIX + country] = buildMarketSnapshot(free.map((a) => a.app_id));
+      markets[COMPETITOR_GROSS_PREFIX + country] = buildMarketSnapshot(gross.map((a) => a.app_id));
+      for (const a of [...free, ...gross]) metaMap.set(a.app_id, a);
+      ok++;
+      console.log(`  ✓ ${country}: 免费 ${free.length} / 畅销 ${gross.length}`);
+    } catch (err) {
+      fail++;
+      console.error(`  ✗ ${country} 竞品榜: ${(err as Error).message}`);
+    }
+  }
+
   console.log(`\n榜单拉取完成: ${ok} 成功, ${fail} 失败`);
   if (ok === 0) { console.error("全部失败，终止"); return; }
 
@@ -117,7 +138,9 @@ async function main(): Promise<void> {
     }
 
     // iOS：折叠卡片消息（每个国家一个折叠面板）
-    const iosPushed = pushed.filter((a) => a.country !== STEAM_MARKET && a.country !== WISHLIST_MARKET);
+    const iosPushed = pushed.filter(
+      (a) => a.country !== STEAM_MARKET && a.country !== WISHLIST_MARKET && !isCompetitorMarket(a.country)
+    );
     if (iosPushed.length > 0) {
       try {
         const iosAnomalies = resolveAnomalies(iosPushed, metaMap);
@@ -135,19 +158,40 @@ async function main(): Promise<void> {
 
     // Steam 合并卡片（在线榜 + 愿望单榜）
     const stPushed = pushed.filter((a) => a.country === STEAM_MARKET);
-    // 愿望单暂不推送，仅积累快照
-    const wlAnomalies = resolveAnomalies([], metaMap);
-    if (stPushed.length > 0) {
+    const wlPushed = pushed.filter((a) => a.country === WISHLIST_MARKET);
+    if (stPushed.length > 0 || wlPushed.length > 0) {
       try {
         const stAnomalies = resolveAnomalies(stPushed, metaMap);
+        const wlAnomalies = resolveAnomalies(wlPushed, metaMap);
         const card = buildSteamCard(stAnomalies, wlAnomalies, date);
         if (card) {
-          console.log(`\n── Steam 消息 (${stPushed.length} 条) ──`);
+          console.log(`\n── Steam 消息 (在线榜 ${stPushed.length} 条, 愿望单 ${wlPushed.length} 条) ──`);
           console.log(JSON.stringify(card, null, 2));
           await sendCard(card.title, card.elements);
         }
       } catch (err) {
         console.error(`[reporter] Steam 飞书推送失败（快照已保存）: ${(err as Error).message}`);
+      }
+    }
+
+    // 竞品榜单卡片（免费榜 + 畅销榜，仅白名单产品）
+    const competitorRaw = rawAnomalies.filter(
+      (a) => isCompetitorMarket(a.country) && COMPETITOR_APPS.has(a.appId)
+    );
+    if (competitorRaw.length > 0) {
+      try {
+        const competitorAnomalies = resolveAnomalies(competitorRaw, metaMap).map((a) => ({
+          ...a,
+          appName: COMPETITOR_APPS.get(a.appId) || a.appName,
+        }));
+        const card = buildCompetitorCard(competitorAnomalies, date);
+        if (card) {
+          console.log(`\n── 竞品榜单消息 (${competitorRaw.length} 条) ──`);
+          console.log(JSON.stringify(card, null, 2));
+          await sendCard(card.title, card.elements);
+        }
+      } catch (err) {
+        console.error(`[reporter] 竞品飞书推送失败（快照已保存）: ${(err as Error).message}`);
       }
     }
   } else {
