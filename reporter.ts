@@ -3,7 +3,7 @@
  */
 
 import type { Anomaly } from "./types.js";
-import { MAX_RETRIES, ROBLOX_MARKET, STEAM_MARKET, WISHLIST_MARKET, HIDDEN_WINDOWS, MARKETS, COMPETITOR_FREE_PREFIX } from "./config.js";
+import { MAX_RETRIES, ROBLOX_MARKET, STEAM_MARKET, WISHLIST_MARKET, HIDDEN_WINDOWS, MARKETS, COMPETITOR_FREE_PREFIX, COMPETITOR_GROSS_PREFIX } from "./config.js";
 import { createHmac } from "crypto";
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -401,50 +401,60 @@ export function buildCompetitorCard(
 ): { title: string; elements: unknown[] } | null {
   if (anomalies.length === 0) return null;
 
-  // 市场 key 形如 TF:US / TG:US，按基础国家分组
-  const byCountry = new Map<string, { free: Anomaly[]; gross: Anomaly[] }>();
-  for (const a of anomalies) {
-    const cc = a.country.slice(3);
-    if (!byCountry.has(cc)) byCountry.set(cc, { free: [], gross: [] });
-    const bucket = byCountry.get(cc)!;
-    if (a.country.startsWith(COMPETITOR_FREE_PREFIX)) bucket.free.push(a);
-    else bucket.gross.push(a);
-  }
-
   // 按 MARKETS 定义顺序展示地区，保持每天消息结构稳定
   const marketOrder = Object.keys(MARKETS);
-  const countries = [...byCountry.keys()].sort(
-    (a, b) => (marketOrder.indexOf(a) + 1 || 999) - (marketOrder.indexOf(b) + 1 || 999)
-  );
 
-  const countryPanels: unknown[] = [];
-  for (const cc of countries) {
-    const { free, gross } = byCountry.get(cc)!;
-    const total = free.length + gross.length;
-
-    const contentLines: string[] = [];
-    if (free.length > 0) {
-      contentLines.push("🆓 免费榜");
-      for (const app of [...free].sort((a, b) => a.currentRank - b.currentRank)) appendApp(contentLines, app);
+  // 市场 key 形如 TF:US / TG:US，先按榜单类型（免费/畅销）拆开，再各自按国家分组
+  const buildChartPanel = (label: string, list: Anomaly[]): unknown => {
+    const byCountry = new Map<string, Anomaly[]>();
+    for (const a of list) {
+      const cc = a.country.slice(3);
+      if (!byCountry.has(cc)) byCountry.set(cc, []);
+      byCountry.get(cc)!.push(a);
     }
-    if (gross.length > 0) {
-      contentLines.push("💰 畅销榜");
-      for (const app of [...gross].sort((a, b) => a.currentRank - b.currentRank)) appendApp(contentLines, app);
-    }
+    const countries = [...byCountry.keys()].sort(
+      (a, b) => (marketOrder.indexOf(a) + 1 || 999) - (marketOrder.indexOf(b) + 1 || 999)
+    );
 
-    countryPanels.push({
+    const countryPanels = countries.map((cc) => {
+      const apps = [...byCountry.get(cc)!].sort((a, b) => a.currentRank - b.currentRank);
+      const lines: string[] = [];
+      for (const app of apps) appendApp(lines, app);
+      return {
+        tag: "collapsible_panel",
+        expanded: false,
+        header: {
+          title: { tag: "markdown", content: `<font color='blue'>**${MARKETS[cc] || cc}**</font> (${apps.length} 款)` },
+          icon: { tag: "standard_icon", token: "down-small-ccm_outlined", size: "16px 16px" },
+          icon_position: "right" as const,
+          icon_expanded_angle: -180,
+        },
+        border: { color: "grey", corner_radius: "5px" },
+        elements: [{ tag: "markdown", content: lines.join("\n") }],
+      };
+    });
+
+    return {
       tag: "collapsible_panel",
       expanded: false,
       header: {
-        title: { tag: "markdown", content: `<font color='blue'>**${MARKETS[cc] || cc}**</font> (${total} 款)` },
+        title: { tag: "plain_text", content: `${label} — ${countries.length} 个地区，共 ${list.length} 款` },
         icon: { tag: "standard_icon", token: "down-small-ccm_outlined", size: "16px 16px" },
         icon_position: "right" as const,
         icon_expanded_angle: -180,
       },
       border: { color: "grey", corner_radius: "5px" },
-      elements: [{ tag: "markdown", content: contentLines.join("\n") }],
-    });
-  }
+      elements: countryPanels,
+    };
+  };
+
+  const free = anomalies.filter((a) => a.country.startsWith(COMPETITOR_FREE_PREFIX));
+  const gross = anomalies.filter((a) => a.country.startsWith(COMPETITOR_GROSS_PREFIX));
+  const chartPanels: unknown[] = [];
+  if (free.length > 0) chartPanels.push(buildChartPanel("🆓 免费榜", free));
+  if (gross.length > 0) chartPanels.push(buildChartPanel("💰 畅销榜", gross));
+
+  const countryCount = new Set(anomalies.map((a) => a.country.slice(3))).size;
 
   return {
     title: `🏆 竞品榜单异动警报 | ${date}`,
@@ -453,13 +463,13 @@ export function buildCompetitorCard(
         tag: "collapsible_panel",
         expanded: false,
         header: {
-          title: { tag: "plain_text", content: `🏆 竞品榜单 — ${countries.length} 个地区，共 ${anomalies.length} 款` },
+          title: { tag: "plain_text", content: `🏆 竞品榜单 — ${countryCount} 个地区，共 ${anomalies.length} 款` },
           icon: { tag: "standard_icon", token: "down-small-ccm_outlined", size: "16px 16px" },
           icon_position: "right" as const,
           icon_expanded_angle: -180,
         },
         border: { color: "grey", corner_radius: "5px" },
-        elements: countryPanels,
+        elements: chartPanels,
       },
     ],
   };
