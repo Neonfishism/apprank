@@ -388,11 +388,11 @@ export function buildSteamCard(
   };
 }
 
-// ── 竞品榜单卡片 (免费榜 + 畅销榜，按地区分组，默认折叠) ──
+// ── 竞品榜单卡片 (顶层拆免费榜 / 畅销榜，榜内地区平铺，默认折叠) ──
 
 /**
- * 构建竞品榜单异动卡片：顶层一个折叠面板，内部每个地区一个次级折叠面板，
- * 地区内分免费榜 / 畅销榜两节。默认全部收起。
+ * 构建竞品榜单异动卡片：顶层按榜单类型拆成两个折叠面板（🆓 免费榜 / 💰 畅销榜），
+ * 面板内各地区平铺展示、不再折叠。默认全部收起。
  * 输入须已按白名单过滤（见 competitors.ts）。
  */
 export function buildCompetitorCard(
@@ -416,23 +416,7 @@ export function buildCompetitorCard(
       (a, b) => (marketOrder.indexOf(a) + 1 || 999) - (marketOrder.indexOf(b) + 1 || 999)
     );
 
-    const countryPanels = countries.map((cc) => {
-      const apps = [...byCountry.get(cc)!].sort((a, b) => a.currentRank - b.currentRank);
-      const lines: string[] = [];
-      for (const app of apps) appendApp(lines, app);
-      return {
-        tag: "collapsible_panel",
-        expanded: false,
-        header: {
-          title: { tag: "markdown", content: `<font color='blue'>**${MARKETS[cc] || cc}**</font> (${apps.length} 款)` },
-          icon: { tag: "standard_icon", token: "down-small-ccm_outlined", size: "16px 16px" },
-          icon_position: "right" as const,
-          icon_expanded_angle: -180,
-        },
-        border: { color: "grey", corner_radius: "5px" },
-        elements: [{ tag: "markdown", content: lines.join("\n") }],
-      };
-    });
+    const blocks = countries.map((cc) => renderRegionBlock(cc, byCountry.get(cc)!));
 
     return {
       tag: "collapsible_panel",
@@ -444,7 +428,7 @@ export function buildCompetitorCard(
         icon_expanded_angle: -180,
       },
       border: { color: "grey", corner_radius: "5px" },
-      elements: countryPanels,
+      elements: [{ tag: "markdown", content: blocks.join("\n---\n") }],
     };
   };
 
