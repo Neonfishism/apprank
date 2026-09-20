@@ -454,24 +454,9 @@ export function buildCompetitorCard(
   if (free.length > 0) chartPanels.push(buildChartPanel("🆓 免费榜", free));
   if (gross.length > 0) chartPanels.push(buildChartPanel("💰 畅销榜", gross));
 
-  const countryCount = new Set(anomalies.map((a) => a.country.slice(3))).size;
-
   return {
     title: `🏆 竞品榜单异动警报 | ${date}`,
-    elements: [
-      {
-        tag: "collapsible_panel",
-        expanded: false,
-        header: {
-          title: { tag: "plain_text", content: `🏆 竞品榜单 — ${countryCount} 个地区，共 ${anomalies.length} 款` },
-          icon: { tag: "standard_icon", token: "down-small-ccm_outlined", size: "16px 16px" },
-          icon_position: "right" as const,
-          icon_expanded_angle: -180,
-        },
-        border: { color: "grey", corner_radius: "5px" },
-        elements: chartPanels,
-      },
-    ],
+    elements: chartPanels,
   };
 }
 
