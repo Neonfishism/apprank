@@ -388,10 +388,11 @@ export function buildSteamCard(
   };
 }
 
-// ── 竞品榜单卡片 (免费榜 + 畅销榜，按地区分组) ──
+// ── 竞品榜单卡片 (免费榜 + 畅销榜，按地区分组，默认折叠) ──
 
 /**
- * 构建竞品榜单异动卡片：按地区分组，地区内分免费榜 / 畅销榜两节。
+ * 构建竞品榜单异动卡片：顶层一个折叠面板，内部每个地区一个次级折叠面板，
+ * 地区内分免费榜 / 畅销榜两节。默认全部收起。
  * 输入须已按白名单过滤（见 competitors.ts）。
  */
 export function buildCompetitorCard(
@@ -416,25 +417,51 @@ export function buildCompetitorCard(
     (a, b) => (marketOrder.indexOf(a) + 1 || 999) - (marketOrder.indexOf(b) + 1 || 999)
   );
 
-  const lines: string[] = [];
+  const countryPanels: unknown[] = [];
   for (const cc of countries) {
     const { free, gross } = byCountry.get(cc)!;
-    lines.push(`<font color='blue'>**${MARKETS[cc] || cc}**</font>`);
+    const total = free.length + gross.length;
+
+    const contentLines: string[] = [];
     if (free.length > 0) {
-      lines.push("  🆓 免费榜");
-      for (const app of [...free].sort((a, b) => a.currentRank - b.currentRank)) appendApp(lines, app);
+      contentLines.push("🆓 免费榜");
+      for (const app of [...free].sort((a, b) => a.currentRank - b.currentRank)) appendApp(contentLines, app);
     }
     if (gross.length > 0) {
-      lines.push("  💰 畅销榜");
-      for (const app of [...gross].sort((a, b) => a.currentRank - b.currentRank)) appendApp(lines, app);
+      contentLines.push("💰 畅销榜");
+      for (const app of [...gross].sort((a, b) => a.currentRank - b.currentRank)) appendApp(contentLines, app);
     }
-    lines.push("---");
+
+    countryPanels.push({
+      tag: "collapsible_panel",
+      expanded: false,
+      header: {
+        title: { tag: "markdown", content: `<font color='blue'>**${MARKETS[cc] || cc}**</font> (${total} 款)` },
+        icon: { tag: "standard_icon", token: "down-small-ccm_outlined", size: "16px 16px" },
+        icon_position: "right" as const,
+        icon_expanded_angle: -180,
+      },
+      border: { color: "grey", corner_radius: "5px" },
+      elements: [{ tag: "markdown", content: contentLines.join("\n") }],
+    });
   }
-  lines.push(`共 ${anomalies.length} 款产品触发异动`);
 
   return {
     title: `🏆 竞品榜单异动警报 | ${date}`,
-    elements: [{ tag: "markdown", content: lines.join("\n") }],
+    elements: [
+      {
+        tag: "collapsible_panel",
+        expanded: false,
+        header: {
+          title: { tag: "plain_text", content: `🏆 竞品榜单 — ${countries.length} 个地区，共 ${anomalies.length} 款` },
+          icon: { tag: "standard_icon", token: "down-small-ccm_outlined", size: "16px 16px" },
+          icon_position: "right" as const,
+          icon_expanded_angle: -180,
+        },
+        border: { color: "grey", corner_radius: "5px" },
+        elements: countryPanels,
+      },
+    ],
   };
 }
 
