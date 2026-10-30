@@ -8,11 +8,11 @@ import { fetchRobloxRankings } from "./fetcher-roblox.js";
 import { fetchSteamRankings } from "./fetcher-steam.js";
 import { fetchWishlistRankings } from "./fetcher-wishlist.js";
 import { fetchCompetitorChart } from "./fetcher-competitors.js";
-import { COMPETITOR_APPS } from "./competitors.js";
+import { COMPETITOR_APPS, competitorKind } from "./competitors.js";
 import { saveSnapshot, loadSnapshot, buildMarketSnapshot, getDateBefore, getCleanupCutoff, cleanOldSnapshots } from "./snapshot.js";
 import { detectAnomalies, resolveAnomalies } from "./comparator.js";
 import { buildIosCollapsibleCards, buildSteamCard, buildCompetitorCard, sendCard } from "./reporter.js";
-import { MARKET_CODES, ROBLOX_MARKET, STEAM_MARKET, WISHLIST_MARKET, SILENT_MARKETS, COMPARISON_WINDOWS, SNAPSHOT_DIR, COMPETITOR_FREE_PREFIX, COMPETITOR_GROSS_PREFIX, isCompetitorMarket } from "./config.js";
+import { MARKET_CODES, ROBLOX_MARKET, STEAM_MARKET, WISHLIST_MARKET, SILENT_MARKETS, COMPARISON_WINDOWS, SNAPSHOT_DIR, COMPETITOR_FREE_PREFIX, COMPETITOR_GROSS_PREFIX, COMPETITOR_GAME_FREE_PREFIX, COMPETITOR_GAME_GROSS_PREFIX, isCompetitorMarket, isGameChartMarket } from "./config.js";
 import type { DailySnapshot, AppMeta } from "./types.js";
 import { existsSync } from "fs";
 import { join } from "path";
@@ -88,19 +88,26 @@ async function main(): Promise<void> {
     console.error(`  ✗ 愿望单: ${(err as Error).message}`);
   }
 
-  // ── 竞品榜单（免费榜 + 畅销榜总榜）──
-  console.log("[竞品] 拉取 16 国免费榜/畅销榜...");
+  // ── 竞品榜单：应用总榜 + 游戏榜，各含免费/畅销 ──
+  // 应用类竞品只看应用总榜，游戏类竞品只看游戏榜（依据 App Store 主分类，见 competitors.ts）
+  console.log("[竞品] 拉取 16 国应用总榜 + 游戏榜（免费/畅销）...");
   for (const country of MARKET_CODES) {
     try {
-      const [free, gross] = await Promise.all([
-        fetchCompetitorChart(country, "free"),
-        fetchCompetitorChart(country, "gross"),
+      const [appFree, appGross, gameFree, gameGross] = await Promise.all([
+        fetchCompetitorChart(country, "free", "app"),
+        fetchCompetitorChart(country, "gross", "app"),
+        fetchCompetitorChart(country, "free", "game"),
+        fetchCompetitorChart(country, "gross", "game"),
       ]);
-      markets[COMPETITOR_FREE_PREFIX + country] = buildMarketSnapshot(free.map((a) => a.app_id));
-      markets[COMPETITOR_GROSS_PREFIX + country] = buildMarketSnapshot(gross.map((a) => a.app_id));
-      for (const a of [...free, ...gross]) metaMap.set(a.app_id, a);
+      markets[COMPETITOR_FREE_PREFIX + country] = buildMarketSnapshot(appFree.map((a) => a.app_id));
+      markets[COMPETITOR_GROSS_PREFIX + country] = buildMarketSnapshot(appGross.map((a) => a.app_id));
+      markets[COMPETITOR_GAME_FREE_PREFIX + country] = buildMarketSnapshot(gameFree.map((a) => a.app_id));
+      markets[COMPETITOR_GAME_GROSS_PREFIX + country] = buildMarketSnapshot(gameGross.map((a) => a.app_id));
+      for (const a of [...appFree, ...appGross, ...gameFree, ...gameGross]) metaMap.set(a.app_id, a);
       ok++;
-      console.log(`  ✓ ${country}: 免费 ${free.length} / 畅销 ${gross.length}`);
+      console.log(
+        `  ✓ ${country}: 应用榜 ${appFree.length}/${appGross.length} · 游戏榜 ${gameFree.length}/${gameGross.length}`
+      );
     } catch (err) {
       fail++;
       console.error(`  ✗ ${country} 竞品榜: ${(err as Error).message}`);
@@ -175,9 +182,14 @@ async function main(): Promise<void> {
     }
 
     // 竞品榜单卡片（免费榜 + 畅销榜，仅白名单产品）
-    const competitorRaw = rawAnomalies.filter(
-      (a) => isCompetitorMarket(a.country) && COMPETITOR_APPS.has(a.appId)
-    );
+    // 拆分监控：应用类只取应用总榜（TF:/TG:），游戏类只取游戏榜（GF:/GG:），
+    // 避免同一产品在两套榜单里重复报警
+    const competitorRaw = rawAnomalies.filter((a) => {
+      if (!isCompetitorMarket(a.country)) return false;
+      const kind = competitorKind(a.appId);
+      if (!kind) return false;
+      return kind === "game" ? isGameChartMarket(a.country) : !isGameChartMarket(a.country);
+    });
     if (competitorRaw.length > 0) {
       try {
         const competitorAnomalies = resolveAnomalies(competitorRaw, metaMap).map((a) => ({

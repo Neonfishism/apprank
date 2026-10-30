@@ -1,23 +1,29 @@
 /**
- * 竞品监控白名单 — 语音房社交 / 在线卡拉OK / 派对玩法 / 棋牌玩法
+ * 竞品白名单 — 语音房社交 / 在线卡拉OK / 派对玩法 / 棋牌玩法
  *
- * 来源：16 国 App Store 免费榜 & 畅销榜扫描（2026-09-17），含各产品的地区包体
- * 监控范围：免费榜（TF）与畅销榜（TG）Top100 中的排名异动
+ * 按 App Store 主分类（primaryGenreName）拆分监控榜单：
+ *   - app  类（主分类非 Games）→ 监控「应用总榜」免费/畅销
+ *   - game 类（主分类为 Games）→ 监控「游戏榜」免费/畅销
+ *
+ * 分类依据为 iTunes Lookup API 实测结果，不按产品观感判断。
+ * 例如 WeParty / Jalsat / TopTop 全系在 App Store 均为 Games 分类，
+ * 放到应用总榜会永远抓不到（总榜 Top100 被超级 App 占据）。
+ *
+ * 新增产品时请先用 lookup 确认分类：
+ *   https://itunes.apple.com/lookup?id=<appId>&country=<cc>
  */
 
-export const COMPETITOR_APPS: Map<number, string> = new Map([
+export type CompetitorKind = "app" | "game";
+
+/** 应用类 → 监控应用总榜（Entertainment / Social Networking / Music / Utilities / Lifestyle） */
+const APP_KIND: Array<[number, string]> = [
   // ── 语音房社交 ──
   [1589399089, "WePlay"],
   [1557823712, "WePlay 亚洲版"],
   [1580330718, "WePlay Game & Party"],
-  [1540717507, "WeParty"],
   [1091902866, "Yalla"],
   [1488887716, "Yalla Lite"],
   [1539388601, "YallaChat"],
-  [6752764540, "Jalsat"],
-  [1475867504, "TopTop"],
-  [6470972816, "TopTop Lite KSA"],
-  [6748342498, "TopTop Games & Party"],
   [6746754791, "Habibi"],
   [6478953714, "Xena"],
   [6746920883, "Amar"],
@@ -42,7 +48,6 @@ export const COMPETITOR_APPS: Map<number, string> = new Map([
   [6445807423, "DreamLike"],
   [1006605757, "CamTalk"],
   [6447761097, "JACO"],
-
   // ── 在线卡拉OK ──
   [910513149, "全民K歌"],
   [1163688749, "WeSing"],
@@ -51,7 +56,16 @@ export const COMPETITOR_APPS: Map<number, string> = new Map([
   [509993510, "Smule"],
   [547109049, "Yokee Karaoke"],
   [431050674, "KaraFun"],
+];
 
+/** 游戏类 → 监控游戏榜（primaryGenreName = Games） */
+const GAME_KIND: Array<[number, string]> = [
+  // ── 语音房社交（App Store 归类为 Games）──
+  [1540717507, "WeParty"],
+  [6752764540, "Jalsat"],
+  [1475867504, "TopTop"],
+  [6470972816, "TopTop Lite KSA"],
+  [6748342498, "TopTop Games & Party"],
   // ── 派对玩法（社交推理 / UNO）──
   [1351168404, "Among Us!"],
   [1558248707, "Goose Goose Duck"],
@@ -62,7 +76,6 @@ export const COMPETITOR_APPS: Map<number, string> = new Map([
   [1344700142, "UNO!"],
   [1635937463, "UNO Wonder"],
   [6478143757, "UNO: Arcade Edition"],
-
   // ── 棋牌玩法（Ludo / Jackaroo / Baloot / Okey）──
   [1198143062, "Ludo STAR"],
   [1384367142, "Ludo Titan"],
@@ -95,4 +108,17 @@ export const COMPETITOR_APPS: Map<number, string> = new Map([
   [737698958, "Belote.com"],
   [6470451283, "Tarot Classique"],
   [891825663, "Дурак онлайн"],
+];
+
+/** appId → 展示名（全量白名单） */
+export const COMPETITOR_APPS: Map<number, string> = new Map([...APP_KIND, ...GAME_KIND]);
+
+const KIND_MAP: Map<number, CompetitorKind> = new Map([
+  ...APP_KIND.map(([id]) => [id, "app"] as [number, CompetitorKind]),
+  ...GAME_KIND.map(([id]) => [id, "game"] as [number, CompetitorKind]),
 ]);
+
+/** 查询某竞品应走哪类榜单；非白名单返回 undefined */
+export function competitorKind(appId: number): CompetitorKind | undefined {
+  return KIND_MAP.get(appId);
+}

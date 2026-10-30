@@ -35,13 +35,27 @@ export const WISHLIST_THRESHOLDS: RankThreshold[] = [
   { min: 61, max: 100, threshold: 30 },
 ];
 
-/** 竞品榜单：免费榜市场 key 前缀（Top Free） */
+/** 竞品榜单：应用总榜-免费 市场 key 前缀（Top Free） */
 export const COMPETITOR_FREE_PREFIX = "TF:";
 
-/** 竞品榜单：畅销榜市场 key 前缀（Top Grossing） */
+/** 竞品榜单：应用总榜-畅销 市场 key 前缀（Top Grossing） */
 export const COMPETITOR_GROSS_PREFIX = "TG:";
 
-/** 竞品榜单阈值（免费榜与畅销榜共用） */
+/** 竞品榜单：游戏榜-免费 市场 key 前缀（Game Free） */
+export const COMPETITOR_GAME_FREE_PREFIX = "GF:";
+
+/** 竞品榜单：游戏榜-畅销 市场 key 前缀（Game Grossing） */
+export const COMPETITOR_GAME_GROSS_PREFIX = "GG:";
+
+/** 全部竞品市场前缀，长度统一为 3，便于 slice(3) 还原国家码 */
+const COMPETITOR_PREFIXES = [
+  COMPETITOR_FREE_PREFIX,
+  COMPETITOR_GROSS_PREFIX,
+  COMPETITOR_GAME_FREE_PREFIX,
+  COMPETITOR_GAME_GROSS_PREFIX,
+];
+
+/** 竞品榜单阈值（四类榜单共用） */
 export const COMPETITOR_THRESHOLDS: RankThreshold[] = [
   { min: 1, max: 10, threshold: 4 },
   { min: 11, max: 30, threshold: 10 },
@@ -49,9 +63,19 @@ export const COMPETITOR_THRESHOLDS: RankThreshold[] = [
   { min: 61, max: 100, threshold: 25 },
 ];
 
-/** 判断是否为竞品榜单市场（TF:XX / TG:XX） */
+/** 判断是否为竞品榜单市场（TF:/TG:/GF:/GG: + 国家码） */
 export function isCompetitorMarket(market?: string): boolean {
-  return !!market && (market.startsWith(COMPETITOR_FREE_PREFIX) || market.startsWith(COMPETITOR_GROSS_PREFIX));
+  return !!market && COMPETITOR_PREFIXES.some((p) => market.startsWith(p));
+}
+
+/** 判断竞品市场是否为免费榜（应用总榜或游戏榜） */
+export function isFreeChartMarket(market: string): boolean {
+  return market.startsWith(COMPETITOR_FREE_PREFIX) || market.startsWith(COMPETITOR_GAME_FREE_PREFIX);
+}
+
+/** 判断竞品市场是否来自游戏榜 */
+export function isGameChartMarket(market: string): boolean {
+  return market.startsWith(COMPETITOR_GAME_FREE_PREFIX) || market.startsWith(COMPETITOR_GAME_GROSS_PREFIX);
 }
 
 export const COMPARISON_WINDOWS: { days: number; label: string }[] = [

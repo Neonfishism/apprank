@@ -3,7 +3,7 @@
  */
 
 import type { Anomaly } from "./types.js";
-import { MAX_RETRIES, ROBLOX_MARKET, STEAM_MARKET, WISHLIST_MARKET, HIDDEN_WINDOWS, MARKETS, COMPETITOR_FREE_PREFIX, COMPETITOR_GROSS_PREFIX } from "./config.js";
+import { MAX_RETRIES, ROBLOX_MARKET, STEAM_MARKET, WISHLIST_MARKET, HIDDEN_WINDOWS, MARKETS, isFreeChartMarket, isGameChartMarket } from "./config.js";
 import { createHmac } from "crypto";
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -393,7 +393,11 @@ export function buildSteamCard(
 /**
  * 构建竞品榜单异动卡片：顶层按榜单类型拆成两个折叠面板（🆓 免费榜 / 💰 畅销榜），
  * 面板内各地区平铺展示、不再折叠。默认全部收起。
- * 输入须已按白名单过滤（见 competitors.ts）。
+ *
+ * 地区块会标注榜单来源（应用榜 / 游戏榜）——应用类竞品取应用总榜、游戏类取游戏榜，
+ * 两者名次不可直接比较，必须显式区分，否则「应用榜 #41」与「游戏榜 #19」会被误读。
+ *
+ * 输入须已按白名单与榜单归属过滤（见 competitors.ts / index.ts）。
  */
 export function buildCompetitorCard(
   anomalies: Anomaly[],
@@ -404,25 +408,38 @@ export function buildCompetitorCard(
   // 按 MARKETS 定义顺序展示地区，保持每天消息结构稳定
   const marketOrder = Object.keys(MARKETS);
 
-  // 市场 key 形如 TF:US / TG:US，先按榜单类型（免费/畅销）拆开，再各自按国家分组
+  // 市场 key 形如 TF:US / GG:SA，先按榜单类型（免费/畅销）拆开，
+  // 再按「地区 + 榜单来源」分块
   const buildChartPanel = (label: string, list: Anomaly[]): unknown => {
-    const byCountry = new Map<string, Anomaly[]>();
+    const groups = new Map<string, Anomaly[]>();
     for (const a of list) {
-      const cc = a.country.slice(3);
-      if (!byCountry.has(cc)) byCountry.set(cc, []);
-      byCountry.get(cc)!.push(a);
+      const key = `${a.country.slice(3)}|${isGameChartMarket(a.country) ? "game" : "app"}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(a);
     }
-    const countries = [...byCountry.keys()].sort(
-      (a, b) => (marketOrder.indexOf(a) + 1 || 999) - (marketOrder.indexOf(b) + 1 || 999)
-    );
 
-    const blocks = countries.map((cc) => renderRegionBlock(cc, byCountry.get(cc)!));
+    const order = (k: string) => {
+      const [cc, scope] = k.split("|");
+      // 先按地区顺序，同地区内应用榜在前
+      return (marketOrder.indexOf(cc) + 1 || 999) * 10 + (scope === "app" ? 0 : 1);
+    };
+    const keys = [...groups.keys()].sort((a, b) => order(a) - order(b));
 
+    const blocks = keys.map((k) => {
+      const [cc, scope] = k.split("|");
+      const apps = [...groups.get(k)!].sort((a, b) => a.currentRank - b.currentRank);
+      const scopeLabel = scope === "game" ? "游戏榜" : "应用榜";
+      const lines = [`  <font color='blue'>**${MARKETS[cc] || cc}**</font> · ${scopeLabel}`];
+      for (const app of apps) appendApp(lines, app);
+      return lines.join("\n");
+    });
+
+    const regionCount = new Set(keys.map((k) => k.split("|")[0])).size;
     return {
       tag: "collapsible_panel",
       expanded: false,
       header: {
-        title: { tag: "plain_text", content: `${label} — ${countries.length} 个地区，共 ${list.length} 款` },
+        title: { tag: "plain_text", content: `${label} — ${regionCount} 个地区，共 ${list.length} 款` },
         icon: { tag: "standard_icon", token: "down-small-ccm_outlined", size: "16px 16px" },
         icon_position: "right" as const,
         icon_expanded_angle: -180,
@@ -432,8 +449,8 @@ export function buildCompetitorCard(
     };
   };
 
-  const free = anomalies.filter((a) => a.country.startsWith(COMPETITOR_FREE_PREFIX));
-  const gross = anomalies.filter((a) => a.country.startsWith(COMPETITOR_GROSS_PREFIX));
+  const free = anomalies.filter((a) => isFreeChartMarket(a.country));
+  const gross = anomalies.filter((a) => !isFreeChartMarket(a.country));
   const chartPanels: unknown[] = [];
   if (free.length > 0) chartPanels.push(buildChartPanel("🆓 免费榜", free));
   if (gross.length > 0) chartPanels.push(buildChartPanel("💰 畅销榜", gross));
