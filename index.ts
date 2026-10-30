@@ -11,7 +11,7 @@ import { fetchCompetitorChart } from "./fetcher-competitors.js";
 import { COMPETITOR_APPS } from "./competitors.js";
 import { saveSnapshot, loadSnapshot, buildMarketSnapshot, getDateBefore, getCleanupCutoff, cleanOldSnapshots } from "./snapshot.js";
 import { detectAnomalies, resolveAnomalies } from "./comparator.js";
-import { buildFeishuMessage, buildIosCollapsibleCards, buildSteamCard, buildCompetitorCard, sendFeishuMessage, sendCard } from "./reporter.js";
+import { buildIosCollapsibleCards, buildSteamCard, buildCompetitorCard, sendCard } from "./reporter.js";
 import { MARKET_CODES, ROBLOX_MARKET, STEAM_MARKET, WISHLIST_MARKET, SILENT_MARKETS, COMPARISON_WINDOWS, SNAPSHOT_DIR, COMPETITOR_FREE_PREFIX, COMPETITOR_GROSS_PREFIX, isCompetitorMarket } from "./config.js";
 import type { DailySnapshot, AppMeta } from "./types.js";
 import { existsSync } from "fs";
