@@ -66,6 +66,10 @@ const GAME_KIND: Array<[number, string]> = [
   [1475867504, "TopTop"],
   [6470972816, "TopTop Lite KSA"],
   [6748342498, "TopTop Games & Party"],
+  [6742122160, "TopTop 日本版"],
+  [6760818996, "TopTop 韩国版"],
+  [6748342509, "TopTop 俄语版"],
+  [6476080221, "TopTop 繁中版"],
   // ── 派对玩法（社交推理 / UNO）──
   [1351168404, "Among Us!"],
   [1558248707, "Goose Goose Duck"],
